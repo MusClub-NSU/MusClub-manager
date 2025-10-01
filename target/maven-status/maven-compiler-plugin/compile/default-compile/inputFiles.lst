@@ -1,0 +1,11 @@
+F:\JavaMySQLDemo\src\main\java\com\example\ClubApplication.java
+F:\JavaMySQLDemo\src\main\java\com\example\Controllers\EventController.java
+F:\JavaMySQLDemo\src\main\java\com\example\Controllers\TagController.java
+F:\JavaMySQLDemo\src\main\java\com\example\Controllers\UserController.java
+F:\JavaMySQLDemo\src\main\java\com\example\entity\Event.java
+F:\JavaMySQLDemo\src\main\java\com\example\entity\Tag.java
+F:\JavaMySQLDemo\src\main\java\com\example\entity\User.java
+F:\JavaMySQLDemo\src\main\java\com\example\repository\EventRepository.java
+F:\JavaMySQLDemo\src\main\java\com\example\repository\JpaRepository.java
+F:\JavaMySQLDemo\src\main\java\com\example\repository\TagRepository.java
+F:\JavaMySQLDemo\src\main\java\com\example\repository\UserRepository.java
