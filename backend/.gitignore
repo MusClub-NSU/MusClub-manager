@@ -1,0 +1,71 @@
+### OS ###
+.DS_Store
+Thumbs.db
+
+### IDE: IntelliJ IDEA ###
+.idea/
+*.iml
+*.ipr
+*.iws
+out/
+
+### IDE: Eclipse ###
+.apt_generated
+.classpath
+.factorypath
+.project
+.settings/
+.springBeans
+.sts4-cache
+bin/
+
+### IDE: NetBeans ###
+/nbproject/private/
+/nbbuild/
+/dist/
+/nbdist/
+/.nb-gradle/
+
+### IDE: VS Code ###
+.vscode/
+
+### Gradle ###
+.gradle/
+build/
+**/build/
+!gradle/wrapper/gradle-wrapper.jar
+!gradle/wrapper/gradle-wrapper.properties
+
+### Kotlin/Java ###
+*.class
+*.log
+hs_err_pid*
+replay_pid*
+*.hprof
+
+### Spring Boot / конфиги ###
+application-local.yml
+application-*.local.yml
+application-test.yml
+.env
+.env.*
+*.keystore
+*.p12
+
+### Тесты / репорты / покрытия ###
+test-results/
+**/build/test-results/
+**/build/reports/
+**/build/tmp/
+.jacoco/
+jacoco.exec
+*.exec
+coverage/
+
+### Docker / runtime ###
+docker-data/
+*.pid
+*.sock
+
+### Прочее ###
+.kotlin
