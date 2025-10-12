@@ -1,6 +1,7 @@
 ### OS ###
 .DS_Store
 Thumbs.db
+desktop.ini
 
 ### IDE: IntelliJ IDEA ###
 .idea/
@@ -33,6 +34,7 @@ bin/
 .gradle/
 build/
 **/build/
+# keep wrapper files in repo (important)
 !gradle/wrapper/gradle-wrapper.jar
 !gradle/wrapper/gradle-wrapper.properties
 
@@ -43,7 +45,8 @@ hs_err_pid*
 replay_pid*
 *.hprof
 
-### Spring Boot / конфиги ###
+### Spring Boot / config ###
+# keep main application.yml in VCS, ignore local/test/secret variations
 application-local.yml
 application-*.local.yml
 application-test.yml
@@ -52,7 +55,7 @@ application-test.yml
 *.keystore
 *.p12
 
-### Тесты / репорты / покрытия ###
+### Tests / reports / coverage ###
 test-results/
 **/build/test-results/
 **/build/reports/
@@ -67,5 +70,9 @@ docker-data/
 *.pid
 *.sock
 
-### Прочее ###
+### Editor / misc ###
 .kotlin
+*.swp
+*.swo
+*~
+*.orig
