@@ -34,7 +34,6 @@ bin/
 .gradle/
 build/
 **/build/
-# keep wrapper files in repo (important)
 !gradle/wrapper/gradle-wrapper.jar
 !gradle/wrapper/gradle-wrapper.properties
 
@@ -46,7 +45,6 @@ replay_pid*
 *.hprof
 
 ### Spring Boot / config ###
-# keep main application.yml in VCS, ignore local/test/secret variations
 application-local.yml
 application-*.local.yml
 application-test.yml
