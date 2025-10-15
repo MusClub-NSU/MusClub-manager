@@ -3,6 +3,7 @@ import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import GravityProvider from "./GravityProvider";
 import Sidebar from "./components/Sidebar";
+import { SidebarProvider } from './context/SidebarContext';
 
 import '@gravity-ui/uikit/styles/fonts.css';
 import '@gravity-ui/uikit/styles/styles.css';
@@ -30,14 +31,16 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en">
+    <html lang="ru">
       <body
         className={`${geistSans.variable} ${geistMono.variable} antialiased`}
       >
+      <SidebarProvider>
         <GravityProvider>
             <Sidebar />
             {children}
         </GravityProvider>
+      </SidebarProvider>
       </body>
     </html>
   );
