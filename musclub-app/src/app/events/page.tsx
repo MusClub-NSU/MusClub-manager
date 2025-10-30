@@ -1,7 +1,7 @@
 'use client';
 
 import { Card, Button, Icon, Text, Loader } from '@gravity-ui/uikit';
-import { Bookmark, HandPointRight, Plus, Pencil, TrashBin } from '@gravity-ui/icons';
+import { Bookmark, HandPointRight, Plus, Pencil, TrashBin, Xmark } from '@gravity-ui/icons';
 import React, { useState } from 'react';
 import { useSidebar } from '../context/SidebarContext';
 import { useEvents } from '../../hooks/useApi';
@@ -10,6 +10,17 @@ export default function EventsPage() {
     const { visible } = useSidebar();
     const { events, loading, error, createEvent, updateEvent, deleteEvent } = useEvents({ page: 0, size: 20 });
     const [isCreating, setIsCreating] = useState(false);
+    const [isExpandedOpen, setIsExpandedOpen] = useState(false);
+    const [expandedTitle, setExpandedTitle] = useState('');
+
+    const handleOpenExpanded = (title: string) => {
+        setExpandedTitle(title);
+        setIsExpandedOpen(true);
+    };
+
+    const handleCloseExpanded = () => {
+        setIsExpandedOpen(false);
+    };
 
     const handleCreateEvent = async () => {
         try {
@@ -58,8 +69,8 @@ export default function EventsPage() {
             <div className="flex items-center justify-center min-h-screen p-4">
                 <Card className="p-6 max-w-md">
                     <Text color="danger">Ошибка: {error}</Text>
-                    <Button 
-                        view="outlined" 
+                    <Button
+                        view="outlined"
                         onClick={() => window.location.reload()}
                         className="mt-4"
                     >
@@ -71,6 +82,7 @@ export default function EventsPage() {
     }
 
     return (
+        <>
         <div
             className="
                 overflow-y-auto
@@ -143,7 +155,7 @@ export default function EventsPage() {
                                     <Icon data={Bookmark} size={18} />
                                     <span className="font-bold text-green-600">Активно</span>
                                 </div>
-                                
+
                                 <div className="flex gap-2">
                                     <Button
                                         view="flat"
@@ -168,10 +180,10 @@ export default function EventsPage() {
                                     view="action"
                                     size="m"
                                     className="w-full sm:w-auto transition-opacity"
-                                    onClick={() => alert(`Запись на ${event.title}`)}
+                                    onClick={() => handleOpenExpanded(event.title)}
                                     disabled={visible}
                                 >
-                                    Записаться
+                                    Подробнее
                                 </Button>
                             </div>
                         </Card>
@@ -179,5 +191,27 @@ export default function EventsPage() {
                 })
             )}
         </div>
+
+            {isExpandedOpen && (
+                <div className="fixed inset-0 flex items-center justify-center bg-black/50 backdrop-blur-sm z-50">
+                    <Card className="relative p-6 max-w-lg w-full rounded-2xl bg-white shadow-2xl">
+                        <Button
+                            size="s"
+                            view="flat"
+                            className="absolute top-3 right-3"
+                            onClick={handleCloseExpanded}
+                        >
+                            <Icon data={Xmark} size={18} />
+                        </Button>
+
+                        <h2 className="text-2xl font-bold text-center mb-4">{expandedTitle}</h2>
+                        <Text align="center" color="secondary">
+                            Здесь позже появится подробное описание события
+                        </Text>
+                    </Card>
+                </div>
+            )}
+        </>
+
     );
 }
