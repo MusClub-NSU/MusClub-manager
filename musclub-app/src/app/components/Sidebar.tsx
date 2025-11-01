@@ -8,9 +8,11 @@ import '@gravity-ui/uikit/styles/styles.css';
 import { useSidebar } from '../context/SidebarContext';
 
 export default function Sidebar() {
-    const { visible, setVisible } = useSidebar();
+    const { visible, setVisible, disabled } = useSidebar();
 
-    const toggleDrawer = () => setVisible(!visible);
+    const toggleDrawer = () => {
+        if (!disabled) setVisible(!visible);
+    };
 
     return (
         <>
@@ -24,6 +26,8 @@ export default function Sidebar() {
                     left: 12,
                     zIndex: 2000,
                     borderRadius: '8px',
+                    opacity: disabled ? 0.5 : 1,
+                    pointerEvents: disabled ? 'none' : 'auto',
                 }}
             >
                 <Icon data={Bars} size={24} />
