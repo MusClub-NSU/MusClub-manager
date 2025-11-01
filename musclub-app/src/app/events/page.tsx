@@ -1,15 +1,28 @@
 'use client';
 
 import { Card, Button, Icon, Text, Loader } from '@gravity-ui/uikit';
-import { Bookmark, HandPointRight, Plus, Pencil, TrashBin } from '@gravity-ui/icons';
+import { Bookmark, HandPointRight, Plus, Pencil, TrashBin, Xmark, Clock, Persons, Ban, Check, Wrench, Person} from '@gravity-ui/icons';
 import React, { useState } from 'react';
 import { useSidebar } from '../context/SidebarContext';
 import { useEvents } from '../../hooks/useApi';
 
 export default function EventsPage() {
-    const { visible } = useSidebar();
+    const { visible, setDisabled } = useSidebar();
     const { events, loading, error, createEvent, updateEvent, deleteEvent } = useEvents({ page: 0, size: 20 });
     const [isCreating, setIsCreating] = useState(false);
+    const [isExpandedOpen, setIsExpandedOpen] = useState(false);
+    const [expandedTitle, setExpandedTitle] = useState('');
+
+    const handleOpenExpanded = (title: string) => {
+        setExpandedTitle(title);
+        setIsExpandedOpen(true);
+        setDisabled(true);
+    };
+
+    const handleCloseExpanded = () => {
+        setIsExpandedOpen(false);
+        setDisabled(false);
+    };
 
     const handleCreateEvent = async () => {
         try {
@@ -58,8 +71,8 @@ export default function EventsPage() {
             <div className="flex items-center justify-center min-h-screen p-4">
                 <Card className="p-6 max-w-md">
                     <Text color="danger">Ошибка: {error}</Text>
-                    <Button 
-                        view="outlined" 
+                    <Button
+                        view="outlined"
                         onClick={() => window.location.reload()}
                         className="mt-4"
                     >
@@ -71,6 +84,7 @@ export default function EventsPage() {
     }
 
     return (
+        <>
         <div
             className="
                 overflow-y-auto
@@ -143,7 +157,7 @@ export default function EventsPage() {
                                     <Icon data={Bookmark} size={18} />
                                     <span className="font-bold text-green-600">Активно</span>
                                 </div>
-                                
+
                                 <div className="flex gap-2">
                                     <Button
                                         view="flat"
@@ -168,10 +182,10 @@ export default function EventsPage() {
                                     view="action"
                                     size="m"
                                     className="w-full sm:w-auto transition-opacity"
-                                    onClick={() => alert(`Запись на ${event.title}`)}
+                                    onClick={() => handleOpenExpanded(event.title)}
                                     disabled={visible}
                                 >
-                                    Записаться
+                                    Подробнее
                                 </Button>
                             </div>
                         </Card>
@@ -179,5 +193,131 @@ export default function EventsPage() {
                 })
             )}
         </div>
+
+            {isExpandedOpen && (
+                <div
+                    className="fixed inset-0 flex items-center justify-center bg-background/70 backdrop-blur-sm z-50 px-6"
+                    onClick={handleCloseExpanded}
+                >
+                    <div
+                        className="max-h-[90vh] w-full max-w-6xl overflow-y-auto"
+                        onClick={(e) => e.stopPropagation()}
+                    >
+                        <Card className="relative p-10 rounded-3xl bg-card shadow-2xl flex flex-col gap-8 text-foreground">
+                            <Button
+                                size="s"
+                                view="flat"
+                                className="absolute top-5 right-5"
+                                onClick={handleCloseExpanded}
+                            >
+                                <Icon data={Xmark} size={22} />
+                            </Button>
+
+                            <h2 className="text-4xl font-bold text-center">{expandedTitle}</h2>
+
+                            {(() => {
+                                const event = events.find(e => e.title === expandedTitle);
+                                if (!event) return null;
+                                const { date, time } = formatDateTime(event.startTime);
+
+                                const instruments = [
+                                    { instrument: 'Гитара', player: 'Иван Петров' },
+                                    { instrument: 'Барабаны', player: null },
+                                    { instrument: 'Клавиши', player: 'Анна Смирнова' },
+                                    { instrument: 'Бас-гитара', player: null },
+                                ];
+
+                                return (
+                                    <div className="flex flex-col gap-6">
+                                        <div className="flex flex-wrap justify-between items-center text-lg">
+                                            <div className="flex items-center gap-2">
+                                                <Icon data={Clock} size={20} />
+                                                <span className="font-semibold">
+                                        {date} • {time}
+                                    </span>
+                                            </div>
+                                            <div className="flex items-center gap-2 text-green-600 font-medium">
+                                                <Icon data={Bookmark} size={18} />
+                                                Активно
+                                            </div>
+                                        </div>
+
+                                        {event.venue && (
+                                            <div className="flex items-center gap-2 text-lg">
+                                                <Icon data={HandPointRight} size={20} />
+                                                <span>{event.venue}</span>
+                                            </div>
+                                        )}
+
+                                        {event.description && (
+                                            <div className="mt-2 text-base leading-relaxed">
+                                                {event.description}
+                                            </div>
+                                        )}
+
+                                        <div>
+                                            <h3 className="text-2xl font-semibold mb-3 flex items-center gap-2">
+                                                <Icon data={Persons} size={20} />
+                                                Необходимые участники
+                                            </h3>
+                                            <table className="w-full border-collapse rounded-lg overflow-hidden">
+                                                <thead className="text-left">
+                                                <tr>
+                                                    <th className="p-3 text-lg font-medium border-b">
+                                                        <div className="flex items-center gap-2">
+                                                            <Icon data={Wrench} size={18} />
+                                                            Инструмент
+                                                        </div>
+                                                    </th>
+                                                    <th className="p-3 text-lg font-medium border-b">
+                                                        <div className="flex items-center gap-2">
+                                                            <Icon data={Person} size={18} />
+                                                            Игрок
+                                                        </div>
+                                                    </th>
+                                                </tr>
+                                                </thead>
+                                                <tbody>
+                                                {instruments.map((row, idx) => (
+                                                    <tr key={idx} className="transition-colors">
+                                                        <td className="p-3 border-b text-base">{row.instrument}</td>
+                                                        <td className="p-3 border-b text-base">
+                                                            {row.player ? (
+                                                                <div className="flex items-center gap-2">
+                                                                    <Icon data={Check} size={16} />
+                                                                    <span className="font-medium">{row.player}</span>
+                                                                </div>
+                                                            ) : (
+                                                                <span className="italic flex items-center gap-2">
+                                                            <Icon data={Ban} size={16} />
+                                                            Нет игрока
+                                                        </span>
+                                                            )}
+                                                        </td>
+                                                    </tr>
+                                                ))}
+                                                </tbody>
+                                            </table>
+                                        </div>
+
+                                        <div className="flex justify-center mt-6">
+                                            <Button
+                                                view="action"
+                                                size="l"
+                                                className="px-10 py-3 rounded-xl text-lg"
+                                                onClick={() => alert(`Вы записались на "${event.title}"`)}
+                                            >
+                                                Записаться
+                                            </Button>
+                                        </div>
+                                    </div>
+                                );
+                            })()}
+                        </Card>
+                    </div>
+                </div>
+            )}
+        </>
+
     );
 }
