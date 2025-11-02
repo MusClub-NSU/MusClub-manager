@@ -32,10 +32,10 @@ export default function Home() {
                             <Text color="danger">Ошибка загрузки: {usersError}</Text>
                         ) : (
                             <>
-                                <Text variant="subheader-1" className="mb-4">
+                                <Text variant="subheader-1" className="mb-3">
                                     Всего участников: {users.length}
                                 </Text>
-                                <div className="space-y-2">
+                                <div className="space-y-1">
                                     {users.slice(0, 3).map((user) => (
                                         <div key={user.id} className="flex justify-between items-center">
                                             <Text>{user.username}</Text>
@@ -59,10 +59,10 @@ export default function Home() {
                             <Text color="danger">Ошибка загрузки: {eventsError}</Text>
                         ) : (
                             <>
-                                <Text variant="subheader-1" className="mb-4">
+                                <Text variant="subheader-1" className="mb-3">
                                     Всего мероприятий: {events.length}
                                 </Text>
-                                <div className="space-y-2">
+                                <div className="space-y-1">
                                     {events.slice(0, 3).map((event) => (
                                         <div key={event.id} className="flex justify-between items-center">
                                             <Text>{event.title}</Text>
@@ -86,19 +86,19 @@ export default function Home() {
                     <div className="grid sm:grid-cols-2 gap-4">
                         <Link 
                             href="/participants" 
-                            className="p-4 border rounded-lg hover:bg-gray-50 transition-colors"
+                            className="p-4 border rounded-lg hover:bg-gray-50 transition-colors flex flex-col gap-2"
                         >
-                            <Text variant="subheader-1">Управление участниками</Text>
-                            <Text color="secondary" className="text-sm mt-1">
+                            <Text variant="subheader-1" className="block">Управление участниками</Text>
+                            <Text color="secondary" className="text-sm block">
                                 Добавить, редактировать или удалить участников
                             </Text>
                         </Link>
                         <Link 
                             href="/events" 
-                            className="p-4 border rounded-lg hover:bg-gray-50 transition-colors"
+                            className="p-4 border rounded-lg hover:bg-gray-50 transition-colors flex flex-col gap-2"
                         >
-                            <Text variant="subheader-1">Управление мероприятиями</Text>
-                            <Text color="secondary" className="text-sm mt-1">
+                            <Text variant="subheader-1" className="block">Управление мероприятиями</Text>
+                            <Text color="secondary" className="text-sm block">
                                 Создать новое мероприятие или управлять существующими
                             </Text>
                         </Link>

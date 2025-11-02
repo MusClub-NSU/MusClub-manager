@@ -5,6 +5,7 @@ import { Bookmark, HandPointRight, Plus, Pencil, TrashBin, Xmark, Clock, Persons
 import React, { useState } from 'react';
 import { useSidebar } from '../context/SidebarContext';
 import { useEvents } from '../../hooks/useApi';
+import { Event } from '../../types/api';
 
 export default function EventsPage() {
     const { visible, setDisabled } = useSidebar();
@@ -12,6 +13,14 @@ export default function EventsPage() {
     const [isCreating, setIsCreating] = useState(false);
     const [isExpandedOpen, setIsExpandedOpen] = useState(false);
     const [expandedTitle, setExpandedTitle] = useState('');
+    const [editingEvent, setEditingEvent] = useState<Event | null>(null);
+    const [editFormData, setEditFormData] = useState({
+        title: '',
+        description: '',
+        startTime: '',
+        endTime: '',
+        venue: ''
+    });
 
     const handleOpenExpanded = (title: string) => {
         setExpandedTitle(title);
@@ -26,10 +35,14 @@ export default function EventsPage() {
 
     const handleCreateEvent = async () => {
         try {
+            // Создаем время в будущем (через 1 час от текущего момента)
+            const futureTime = new Date();
+            futureTime.setHours(futureTime.getHours() + 1);
+            
             await createEvent({
                 title: 'Новое мероприятие',
                 description: 'Описание нового мероприятия',
-                startTime: new Date().toISOString(),
+                startTime: futureTime.toISOString(),
                 venue: 'Место проведения'
             });
         } catch (err) {
@@ -44,6 +57,58 @@ export default function EventsPage() {
             } catch (err) {
                 console.error('Ошибка удаления события:', err);
             }
+        }
+    };
+
+    const formatDateForInput = (dateString: string): string => {
+        const date = new Date(dateString);
+        const year = date.getFullYear();
+        const month = String(date.getMonth() + 1).padStart(2, '0');
+        const day = String(date.getDate()).padStart(2, '0');
+        const hours = String(date.getHours()).padStart(2, '0');
+        const minutes = String(date.getMinutes()).padStart(2, '0');
+        return `${year}-${month}-${day}T${hours}:${minutes}`;
+    };
+
+    const handleEditEvent = (event: Event) => {
+        setEditingEvent(event);
+        setEditFormData({
+            title: event.title,
+            description: event.description || '',
+            startTime: event.startTime ? formatDateForInput(event.startTime) : '',
+            endTime: event.endTime ? formatDateForInput(event.endTime) : '',
+            venue: event.venue || ''
+        });
+        setDisabled(true);
+    };
+
+    const handleCloseEdit = () => {
+        setEditingEvent(null);
+        setDisabled(false);
+    };
+
+    const handleSaveEdit = async () => {
+        if (!editingEvent) return;
+
+        try {
+            // Преобразуем локальное время в ISO строку
+            const startTime = editFormData.startTime 
+                ? new Date(editFormData.startTime).toISOString() 
+                : undefined;
+            const endTime = editFormData.endTime 
+                ? new Date(editFormData.endTime).toISOString() 
+                : undefined;
+
+            await updateEvent(editingEvent.id, {
+                title: editFormData.title,
+                description: editFormData.description || undefined,
+                startTime: startTime,
+                endTime: endTime || undefined,
+                venue: editFormData.venue || undefined
+            });
+            handleCloseEdit();
+        } catch (err) {
+            console.error('Ошибка обновления события:', err);
         }
     };
 
@@ -104,8 +169,10 @@ export default function EventsPage() {
                     onClick={handleCreateEvent}
                     disabled={isCreating}
                 >
-                    <Plus size={16} />
-                    Добавить мероприятие
+                    <span className="flex items-center justify-center gap-2">
+                        <Plus size={16} />
+                        <span>Добавить мероприятие</span>
+                    </span>
                 </Button>
             </div>
 
@@ -162,7 +229,7 @@ export default function EventsPage() {
                                     <Button
                                         view="flat"
                                         size="s"
-                                        onClick={() => console.log('Edit event', event.id)}
+                                        onClick={() => handleEditEvent(event)}
                                     >
                                         <Pencil size={14} />
                                     </Button>
@@ -313,6 +380,110 @@ export default function EventsPage() {
                                     </div>
                                 );
                             })()}
+                        </Card>
+                    </div>
+                </div>
+            )}
+
+            {editingEvent && (
+                <div
+                    className="fixed inset-0 flex items-center justify-center bg-background/70 backdrop-blur-sm z-50 px-6"
+                    onClick={handleCloseEdit}
+                >
+                    <div
+                        className="max-h-[90vh] w-full max-w-2xl overflow-y-auto"
+                        onClick={(e) => e.stopPropagation()}
+                    >
+                        <Card className="relative p-10 rounded-3xl bg-card shadow-2xl flex flex-col gap-6 text-foreground">
+                            <Button
+                                size="s"
+                                view="flat"
+                                className="absolute top-5 right-5"
+                                onClick={handleCloseEdit}
+                            >
+                                <Icon data={Xmark} size={22} />
+                            </Button>
+
+                            <h2 className="text-3xl font-bold text-center">Редактировать мероприятие</h2>
+
+                            <div className="flex flex-col gap-4">
+                                <div>
+                                    <label className="block text-sm font-medium mb-2">
+                                        Название *
+                                    </label>
+                                    <input
+                                        type="text"
+                                        value={editFormData.title}
+                                        onChange={(e) => setEditFormData({ ...editFormData, title: e.target.value })}
+                                        className="w-full px-4 py-2 border border-[--foreground]/20 rounded-lg bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                        required
+                                    />
+                                </div>
+
+                                <div>
+                                    <label className="block text-sm font-medium mb-2">
+                                        Описание
+                                    </label>
+                                    <textarea
+                                        value={editFormData.description}
+                                        onChange={(e) => setEditFormData({ ...editFormData, description: e.target.value })}
+                                        className="w-full px-4 py-2 border border-[--foreground]/20 rounded-lg bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"
+                                        rows={4}
+                                    />
+                                </div>
+
+                                <div>
+                                    <label className="block text-sm font-medium mb-2">
+                                        Дата и время начала *
+                                    </label>
+                                    <input
+                                        type="datetime-local"
+                                        value={editFormData.startTime}
+                                        onChange={(e) => setEditFormData({ ...editFormData, startTime: e.target.value })}
+                                        className="w-full px-4 py-2 border border-[--foreground]/20 rounded-lg bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                        required
+                                    />
+                                </div>
+
+                                <div>
+                                    <label className="block text-sm font-medium mb-2">
+                                        Дата и время окончания
+                                    </label>
+                                    <input
+                                        type="datetime-local"
+                                        value={editFormData.endTime}
+                                        onChange={(e) => setEditFormData({ ...editFormData, endTime: e.target.value })}
+                                        className="w-full px-4 py-2 border border-[--foreground]/20 rounded-lg bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                    />
+                                </div>
+
+                                <div>
+                                    <label className="block text-sm font-medium mb-2">
+                                        Место проведения
+                                    </label>
+                                    <input
+                                        type="text"
+                                        value={editFormData.venue}
+                                        onChange={(e) => setEditFormData({ ...editFormData, venue: e.target.value })}
+                                        className="w-full px-4 py-2 border border-[--foreground]/20 rounded-lg bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                    />
+                                </div>
+
+                                <div className="flex justify-end gap-3 mt-4">
+                                    <Button
+                                        view="outlined"
+                                        onClick={handleCloseEdit}
+                                    >
+                                        Отмена
+                                    </Button>
+                                    <Button
+                                        view="action"
+                                        onClick={handleSaveEdit}
+                                    >
+                                        Сохранить
+                                    </Button>
+                                </div>
+                            </div>
                         </Card>
                     </div>
                 </div>

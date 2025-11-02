@@ -1,14 +1,20 @@
 'use client';
 
 import { useUsers } from '../../hooks/useApi';
-import { Button, Card, Text, Loader } from '@gravity-ui/uikit';
-import { Plus, Pencil, TrashBin } from '@gravity-ui/icons';
+import { Button, Card, Text, Loader, Icon } from '@gravity-ui/uikit';
+import { Plus, Pencil, TrashBin, Xmark } from '@gravity-ui/icons';
 import { useState } from 'react';
+import { User } from '../../types/api';
 
 export default function ParticipantsPage() {
     const { users, loading, error, createUser, updateUser, deleteUser } = useUsers({ page: 0, size: 20 });
     const [isCreating, setIsCreating] = useState(false);
-    const [editingId, setEditingId] = useState<number | null>(null);
+    const [editingUser, setEditingUser] = useState<User | null>(null);
+    const [editFormData, setEditFormData] = useState({
+        username: '',
+        email: '',
+        role: 'MEMBER'
+    });
 
     const handleCreateUser = async () => {
         try {
@@ -29,6 +35,34 @@ export default function ParticipantsPage() {
             } catch (err) {
                 console.error('Ошибка удаления пользователя:', err);
             }
+        }
+    };
+
+    const handleEditUser = (user: User) => {
+        setEditingUser(user);
+        setEditFormData({
+            username: user.username,
+            email: user.email,
+            role: user.role
+        });
+    };
+
+    const handleCloseEdit = () => {
+        setEditingUser(null);
+    };
+
+    const handleSaveEdit = async () => {
+        if (!editingUser) return;
+
+        try {
+            await updateUser(editingUser.id, {
+                username: editFormData.username,
+                email: editFormData.email,
+                role: editFormData.role
+            });
+            handleCloseEdit();
+        } catch (err) {
+            console.error('Ошибка обновления пользователя:', err);
         }
     };
 
@@ -81,8 +115,10 @@ export default function ParticipantsPage() {
                         onClick={handleCreateUser}
                         disabled={isCreating}
                     >
-                        <Plus size={16} />
-                        Добавить участника
+                        <span className="flex items-center justify-center gap-2">
+                            <Plus size={16} />
+                            <span>Добавить участника</span>
+                        </span>
                     </Button>
                 </div>
 
@@ -129,7 +165,7 @@ export default function ParticipantsPage() {
                                                 <Button
                                                     view="flat"
                                                     size="s"
-                                                    onClick={() => setEditingId(user.id)}
+                                                    onClick={() => handleEditUser(user)}
                                                 >
                                                     <Pencil size={14} />
                                                 </Button>
@@ -149,6 +185,89 @@ export default function ParticipantsPage() {
                     </div>
                 )}
             </div>
+
+            {editingUser && (
+                <div
+                    className="fixed inset-0 flex items-center justify-center bg-background/70 backdrop-blur-sm z-50 px-6"
+                    onClick={handleCloseEdit}
+                >
+                    <div
+                        className="max-h-[90vh] w-full max-w-2xl overflow-y-auto"
+                        onClick={(e) => e.stopPropagation()}
+                    >
+                        <Card className="relative p-10 rounded-3xl bg-card shadow-2xl flex flex-col gap-6 text-foreground">
+                            <Button
+                                size="s"
+                                view="flat"
+                                className="absolute top-5 right-5"
+                                onClick={handleCloseEdit}
+                            >
+                                <Icon data={Xmark} size={22} />
+                            </Button>
+
+                            <h2 className="text-3xl font-bold text-center">Редактировать участника</h2>
+
+                            <div className="flex flex-col gap-4">
+                                <div>
+                                    <label className="block text-sm font-medium mb-2">
+                                        Имя пользователя *
+                                    </label>
+                                    <input
+                                        type="text"
+                                        value={editFormData.username}
+                                        onChange={(e) => setEditFormData({ ...editFormData, username: e.target.value })}
+                                        className="w-full px-4 py-2 border border-[--foreground]/20 rounded-lg bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                        required
+                                    />
+                                </div>
+
+                                <div>
+                                    <label className="block text-sm font-medium mb-2">
+                                        Email *
+                                    </label>
+                                    <input
+                                        type="email"
+                                        value={editFormData.email}
+                                        onChange={(e) => setEditFormData({ ...editFormData, email: e.target.value })}
+                                        className="w-full px-4 py-2 border border-[--foreground]/20 rounded-lg bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                        required
+                                    />
+                                </div>
+
+                                <div>
+                                    <label className="block text-sm font-medium mb-2">
+                                        Роль *
+                                    </label>
+                                    <select
+                                        value={editFormData.role}
+                                        onChange={(e) => setEditFormData({ ...editFormData, role: e.target.value })}
+                                        className="w-full px-4 py-2 border border-[--foreground]/20 rounded-lg bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                        required
+                                    >
+                                        <option value="MEMBER">Участник</option>
+                                        <option value="ORGANIZER">Организатор</option>
+                                    </select>
+                                </div>
+
+                                <div className="flex justify-end gap-3 mt-4">
+                                    <Button
+                                        view="outlined"
+                                        onClick={handleCloseEdit}
+                                    >
+                                        Отмена
+                                    </Button>
+                                    <Button
+                                        view="action"
+                                        onClick={handleSaveEdit}
+                                    >
+                                        Сохранить
+                                    </Button>
+                                </div>
+                            </div>
+                        </Card>
+                    </div>
+                </div>
+            )}
         </main>
     );
 }

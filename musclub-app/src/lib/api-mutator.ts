@@ -47,3 +47,4 @@ export const customInstance = async <T>(config: any): Promise<T> => {
 };
 
 export default customInstance;
+

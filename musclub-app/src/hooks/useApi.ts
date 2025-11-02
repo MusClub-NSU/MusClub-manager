@@ -159,3 +159,4 @@ export function useEvents(pageable?: Pageable) {
     refetch: fetchEvents,
   };
 }
+

@@ -63,3 +63,4 @@ export interface Page<T> {
   last: boolean;
   numberOfElements: number;
 }
+
