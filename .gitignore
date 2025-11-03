@@ -1,0 +1,40 @@
+# OS
+.DS_Store
+Thumbs.db
+
+# IDE
+.idea/
+.vscode/
+*.iml
+out/
+
+# Logs
+logs/
+*.log
+
+# Env files
+.env
+.env.*
+
+# Node
+node_modules/
+
+# Gradle
+.gradle/
+build/
+
+# Java build
+*.class
+*.jar
+*.war
+*.ear
+
+# Project modules (explicit builds)
+app/build/
+backend/build/
+backend/.gradle/
+
+# Coverage / reports (if any)
+coverage/
+report/
+
