@@ -29,7 +29,6 @@ dependencies {
     testImplementation("org.testcontainers:postgresql")
 }
 
-
 tasks.test {
     useJUnitPlatform()
 }
