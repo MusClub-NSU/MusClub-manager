@@ -1,7 +1,6 @@
 package com.nsu.musclub.domain;
 
 import jakarta.persistence.*;
-
 import java.time.OffsetDateTime;
 
 @Entity
@@ -83,5 +82,28 @@ public class Event {
 
     public void setCreatedAt(OffsetDateTime createdAt) {
         this.createdAt = createdAt;
+    }
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "parent_id")
+    private Event parent;
+
+    @OneToMany(mappedBy = "parent")
+    private java.util.Set<Event> children = new java.util.HashSet<>();
+
+    public Event getParent() {
+        return parent;
+    }
+
+    public void setParent(Event parent) {
+        this.parent = parent;
+    }
+
+    public java.util.Set<Event> getChildren() {
+        return children;
+    }
+
+    public void setChildren(java.util.Set<Event> children) {
+        this.children = children;
     }
 }
