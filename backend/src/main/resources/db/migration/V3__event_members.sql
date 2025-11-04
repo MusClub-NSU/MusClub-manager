@@ -1,0 +1,17 @@
+DO $$
+BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'event_member_role') THEN
+    CREATE TYPE event_member_role AS ENUM ('ORGANIZER','PERFORMER','VOLUNTEER');
+  END IF;
+END$$;
+
+CREATE TABLE IF NOT EXISTS event_members (
+  event_id   BIGINT NOT NULL REFERENCES events(id) ON DELETE CASCADE,
+  user_id    BIGINT NOT NULL REFERENCES users(id)  ON DELETE CASCADE,
+  role       event_member_role NOT NULL DEFAULT 'PERFORMER',
+  added_at   TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  PRIMARY KEY (event_id, user_id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_event_members_event ON event_members(event_id);
+CREATE INDEX IF NOT EXISTS idx_event_members_user  ON event_members(user_id);
