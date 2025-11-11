@@ -116,7 +116,7 @@ export default function ParticipantsPage() {
                         disabled={isCreating}
                     >
                         <span className="flex items-center justify-center gap-2">
-                            <Plus size={16} />
+                        <Plus size={16} />
                             <span>Добавить участника</span>
                         </span>
                     </Button>
