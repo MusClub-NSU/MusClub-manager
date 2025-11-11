@@ -1,9 +1,9 @@
 'use client';
 
 import { useParams, useRouter } from 'next/navigation';
-import { Button, Icon, Text, Loader, Card } from '@gravity-ui/uikit';
-import { Bookmark, HandPointRight, Clock, Persons, Xmark, Plus, TrashBin, Person } from '@gravity-ui/icons';
-import React, { useState } from 'react';
+import { Button, Icon, Text, Loader, Card} from '@gravity-ui/uikit';
+import { Bookmark, HandPointRight, Clock, Persons, Pencil, Check, Xmark, Plus, TrashBin, Person } from '@gravity-ui/icons';
+import React, { useState} from 'react';
 import { useEvents, useUsers } from '../../../hooks/useApi';
 import { useSidebar } from '../../context/SidebarContext';
 
@@ -16,11 +16,11 @@ interface RoleAssignment {
 export default function EventDetailsPage() {
     const { id } = useParams();
     const router = useRouter();
-    const { events, loading, error } = useEvents({ page: 0, size: 100 });
+    const { events, loading, error, updateEvent } = useEvents({ page: 0, size: 100 });
     const { users } = useUsers({ page: 0, size: 100 });
     const { visible } = useSidebar();
     const [activeTab, setActiveTab] = useState('assignments');
-    
+
     // Состояние для назначения людей
     const [roleAssignments, setRoleAssignments] = useState<RoleAssignment[]>([]);
     const [newRoleName, setNewRoleName] = useState('');
@@ -29,6 +29,24 @@ export default function EventDetailsPage() {
     const [newPersonName, setNewPersonName] = useState('');
     const [showAddPerson, setShowAddPerson] = useState<string | null>(null);
 
+    const [isEditing, setIsEditing] = useState(false);
+    const event = events.find((e) => e.id === Number(id));
+
+    const toLocalInputFormat = (isoString: string) => {
+        if (!isoString) return '';
+        const date = new Date(isoString);
+        const pad = (n: number) => String(n).padStart(2, '0');
+        const local = `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`;
+        return local;
+    };
+
+    const [editData, setEditData] = useState({
+        title: event?.title || '',
+        description: event?.description || '',
+        startTime: toLocalInputFormat(event?.startTime || ''),
+        endTime: toLocalInputFormat(event?.endTime || ''),
+        venue: event?.venue || ''
+    });
     if (loading) {
         return (
             <div className="flex items-center justify-center min-h-screen p-4">
@@ -46,7 +64,6 @@ export default function EventDetailsPage() {
         );
     }
 
-    const event = events.find((e) => e.id === Number(id));
     if (!event) {
         return (
             <div className="flex flex-col items-center justify-center min-h-screen">
@@ -66,7 +83,31 @@ export default function EventDetailsPage() {
         };
     };
 
-    const { date, time } = formatDateTime(event.startTime);
+    const { date, time } = formatDateTime(editData.startTime || event.startTime);
+
+    const handleSave = async () => {
+        try {
+            // Преобразуем время начала в ISO
+            const start = new Date(editData.startTime);
+            const startTime = start.toISOString();
+
+            // Автоматически добавляем 2 часа
+            const end = new Date(start.getTime() + 2 * 60 * 60 * 1000);
+            const endTime = end.toISOString();
+
+            await updateEvent(event.id, {
+                title: editData.title,
+                description: editData.description || undefined,
+                startTime,
+                endTime,
+                venue: editData.venue || undefined
+            });
+
+            setIsEditing(false);
+        } catch (err) {
+            console.error('Ошибка обновления события:', err);
+        }
+    };
 
     // Функции для работы с ролями
     const handleAddRole = () => {
@@ -124,11 +165,34 @@ export default function EventDetailsPage() {
         >
             {/* Заголовок */}
             <header className="flex flex-col items-center gap-4 text-center">
-                <h1 className="text-5xl font-bold">{event.title}</h1>
-                <div className="flex flex-wrap justify-center items-center gap-4 text-lg text-[var(--g-color-text-secondary)]">
+                {isEditing ? (
+                    <input
+                        type="text"
+                        value={editData.title}
+                        onChange={(e) => setEditData({...editData, title: e.target.value})}
+                        className="px-3 py-2 border rounded-lg text-center bg-[--g-color-base-generic-hover] text-[--g-color-text-primary] w-full max-w-2xl text-3xl font-bold"
+                    />
+                ) : (
+                    <h1 className="text-5xl font-bold">{event.title}</h1>
+                )}
+
+                <div
+                    className="flex flex-wrap justify-center items-center gap-4 text-lg text-[var(--g-color-text-secondary)]">
                     <div className="flex items-center gap-2">
                         <Icon data={Clock} size={20}/>
-                        <span>{date} • {time}</span>
+                        {isEditing ? (
+                            <input
+                                type="datetime-local"
+                                value={editData.startTime}
+                                onChange={(e) =>
+                                    setEditData({...editData, startTime: e.target.value})
+                                }
+                                min={new Date((Date.now() + 24 * 60 * 60 * 1000)).toISOString().slice(0, 16)} // запрет прошедших дат
+                                className="px-3 py-2 border rounded-lg bg-[--g-color-base-generic-hover] text-[--g-color-text-primary]"
+                            />
+                        ) : (
+                            <span>{date} • {time}</span>
+                        )}
                     </div>
                     <div className="flex items-center gap-2 text-green-600 font-medium">
                         <Icon data={Bookmark} size={18}/>
@@ -139,14 +203,28 @@ export default function EventDetailsPage() {
 
             {/* Описание и локация */}
             <section className="flex flex-col gap-6 text-lg leading-relaxed max-w-4xl mx-auto w-full">
-                {event.venue && (
-                    <div className="flex items-center gap-2">
-                        <Icon data={HandPointRight} size={20}/>
+                <div className="flex items-center gap-2">
+                    <Icon data={HandPointRight} size={20}/>
+                    {isEditing ? (
+                        <input
+                            type="text"
+                            value={editData.venue}
+                            onChange={(e) => setEditData({...editData, venue: e.target.value})}
+                            className="px-3 py-2 border rounded-lg bg-[--g-color-base-generic-hover] text-[--g-color-text-primary] w-full"
+                        />
+                    ) : (
                         <span>{event.venue}</span>
-                    </div>
-                )}
+                    )}
+                </div>
 
-                {event.description && (
+                {isEditing ? (
+                    <textarea
+                        value={editData.description}
+                        onChange={(e) => setEditData({...editData, description: e.target.value})}
+                        className="w-full h-[60px] px-3 py-2 border rounded-lg bg-[--g-color-base-generic-hover] text-[--g-color-text-primary] resize-none overflow-y-auto leading-tight"
+                        rows={2}
+                    />
+                ) : (
                     <p className="text-[var(--g-color-text-secondary)] whitespace-pre-wrap">
                         {event.description}
                     </p>
@@ -155,7 +233,7 @@ export default function EventDetailsPage() {
 
             {/* Табы */}
             <div className="max-w-6xl mx-auto w-full">
-                <div className="border-b border-[--g-color-line-generic] mb-6">
+            <div className="border-b border-[--g-color-line-generic] mb-6">
                     <div className="flex gap-4">
                         {tabsItems.map((tab) => (
                             <button
@@ -185,7 +263,7 @@ export default function EventDetailsPage() {
                                     onClick={() => setShowAddRole(true)}
                                 >
                                     <span className="flex items-center justify-center gap-2">
-                                        <Plus size={16} />
+                                        <Plus size={16}/>
                                         <span>Добавить роль</span>
                                     </span>
                                 </Button>
@@ -218,7 +296,7 @@ export default function EventDetailsPage() {
                                             setNewRoleName('');
                                         }}
                                     >
-                                        <Icon data={Xmark} size={16} />
+                                        <Icon data={Xmark} size={16}/>
                                     </Button>
                                 </div>
                             </Card>
@@ -251,7 +329,7 @@ export default function EventDetailsPage() {
                                                         onClick={() => setShowAddPerson(role.id)}
                                                     >
                                                         <span className="flex items-center gap-1">
-                                                            <Plus size={14} />
+                                                            <Plus size={14}/>
                                                             <span>Добавить человека</span>
                                                         </span>
                                                     </Button>
@@ -261,13 +339,14 @@ export default function EventDetailsPage() {
                                                     size="s"
                                                     onClick={() => handleDeleteRole(role.id)}
                                                 >
-                                                    <Icon data={TrashBin} size={14} />
+                                                    <Icon data={TrashBin} size={14}/>
                                                 </Button>
                                             </div>
                                         </div>
 
                                         {showAddPerson === role.id && (
-                                            <div className="flex gap-2 mb-4 p-3 bg-[--g-color-base-generic-hover] rounded-lg">
+                                            <div
+                                                className="flex gap-2 mb-4 p-3 bg-[--g-color-base-generic-hover] rounded-lg">
                                                 <input
                                                     type="text"
                                                     placeholder="Имя человека"
@@ -293,7 +372,7 @@ export default function EventDetailsPage() {
                                                         setNewPersonName('');
                                                     }}
                                                 >
-                                                    <Icon data={Xmark} size={14} />
+                                                    <Icon data={Xmark} size={14}/>
                                                 </Button>
                                             </div>
                                         )}
@@ -306,7 +385,7 @@ export default function EventDetailsPage() {
                                                         className="flex justify-between items-center p-3 bg-[--g-color-base-generic-hover] rounded-lg"
                                                     >
                                                         <div className="flex items-center gap-2">
-                                                            <Icon data={Person} size={16} />
+                                                            <Icon data={Person} size={16}/>
                                                             <Text>{person}</Text>
                                                         </div>
                                                         <Button
@@ -314,7 +393,7 @@ export default function EventDetailsPage() {
                                                             size="s"
                                                             onClick={() => handleDeletePerson(role.id, idx)}
                                                         >
-                                                            <Icon data={TrashBin} size={14} />
+                                                            <Icon data={TrashBin} size={14}/>
                                                         </Button>
                                                     </div>
                                                 ))}
@@ -329,7 +408,7 @@ export default function EventDetailsPage() {
                             </div>
                         )}
                     </div>
-                    )}
+                )}
 
                 {/* Таб: Планирование таймлайна */}
                 {activeTab === 'timeline' && (
@@ -361,20 +440,44 @@ export default function EventDetailsPage() {
             </div>
 
             {/* Кнопка назад */}
-            <div className="flex justify-center mt-8">
-                <Button
-                    view="outlined"
-                    size="l"
-                    className="min-w-[160px]"
-                    onClick={() => router.back()}
-                    disabled={visible}
-                >
-                    Назад
-                </Button>
+            <div className="flex justify-center gap-6 mt-8">
+                {isEditing ? (
+                    <>
+                        <Button view="outlined" className="min-w-[160px]" size="l" onClick={() => setIsEditing(false)}>
+                            Отмена
+                        </Button>
+                        <Button view="action" className="min-w-[160px]" size="l" onClick={handleSave}>
+                            Сохранить
+                        </Button>
+                    </>
+                ) : (
+                    <>
+                        <Button view="outlined" className="min-w-[160px]" size="l" onClick={() => router.back()} disabled={visible}>
+                            Назад
+                        </Button>
+                        <Button
+                            view="outlined"
+                            className="min-w-[160px]"
+                            size="l"
+                            onClick={() => {
+                                setEditData({
+                                    title: event.title || '',
+                                    description: event.description || '',
+                                    startTime: toLocalInputFormat(event.startTime || ''),
+                                    endTime: toLocalInputFormat(event.endTime || ''),
+                                    venue: event.venue || ''
+                                });
+                                setIsEditing(true);
+                            }}
+                        >
+                            Редактировать
+                        </Button>
+                    </>
+                )}
             </div>
 
             {visible && (
-                <div className="fixed inset-0 bg-background/70 z-40" />
+                <div className="fixed inset-0 bg-background/70 z-40"/>
             )}
         </div>
     );
