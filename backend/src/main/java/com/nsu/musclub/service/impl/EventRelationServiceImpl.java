@@ -143,6 +143,19 @@ public class EventRelationServiceImpl implements EventRelationService {
         dto.setId(root.getId());
         dto.setTitle(root.getTitle());
         dto.setStartTime(root.getStartTime());
+        
+        List<EventMember> eventMembers = members.findByEvent_Id(root.getId());
+        List<EventMemberResponseDto> memberDtos = eventMembers.stream().map(em -> {
+            EventMemberResponseDto memberDto = new EventMemberResponseDto();
+            memberDto.setUserId(em.getUser().getId());
+            memberDto.setUsername(em.getUser().getUsername());
+            memberDto.setEmail(em.getUser().getEmail());
+            memberDto.setRole(em.getRole().name());
+            memberDto.setAddedAt(em.getAddedAt());
+            return memberDto;
+        }).toList();
+        dto.setMembers(memberDtos);
+        
         if (depth <= 1)
             return dto;
         var children = events.findByParentId(root.getId());

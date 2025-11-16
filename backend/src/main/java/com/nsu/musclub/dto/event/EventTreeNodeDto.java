@@ -8,6 +8,7 @@ public class EventTreeNodeDto {
     private Long id;
     private String title;
     private OffsetDateTime startTime;
+    private List<EventMemberResponseDto> members = new ArrayList<>();
     private List<EventTreeNodeDto> children = new ArrayList<>();
 
     public Long getId() {
@@ -32,6 +33,14 @@ public class EventTreeNodeDto {
 
     public void setStartTime(OffsetDateTime startTime) {
         this.startTime = startTime;
+    }
+
+    public List<EventMemberResponseDto> getMembers() {
+        return members;
+    }
+
+    public void setMembers(List<EventMemberResponseDto> members) {
+        this.members = members;
     }
 
     public List<EventTreeNodeDto> getChildren() {
