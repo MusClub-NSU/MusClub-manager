@@ -38,3 +38,5 @@ backend/.gradle/
 coverage/
 report/
 
+中文手册.md
+测试覆盖总结.md
