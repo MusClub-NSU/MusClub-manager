@@ -67,4 +67,29 @@ public class EventController {
     public void removeMember(@PathVariable Long eventId, @PathVariable Long userId) {
         relations.removeMember(eventId, userId);
     }
+
+    @PostMapping("/{parentId}/subevents")
+    @ResponseStatus(HttpStatus.CREATED)
+    public EventResponseDto createSubEvent(@PathVariable Long parentId,
+                                           @RequestBody @Valid EventCreateDto dto) {
+        return relations.createSubEvent(parentId, dto);
+    }
+
+    @PostMapping("/{parentId}/subevents/{childId}")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    public void attachChild(@PathVariable Long parentId, @PathVariable Long childId) {
+        relations.attachChild(parentId, childId);
+    }
+
+    @DeleteMapping("/{parentId}/subevents/{childId}")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    public void detachChild(@PathVariable Long parentId, @PathVariable Long childId) {
+        relations.detachChild(parentId, childId);
+    }
+
+    @GetMapping("/{eventId}/tree")
+    public EventTreeNodeDto tree(@PathVariable Long eventId,
+                                 @RequestParam(defaultValue = "3") int depth) {
+        return relations.getTree(eventId, depth);
+    }
 }
