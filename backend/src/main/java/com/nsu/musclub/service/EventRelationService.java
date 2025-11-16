@@ -1,6 +1,10 @@
 package com.nsu.musclub.service;
 
-import com.nsu.musclub.dto.event.*;
+import com.nsu.musclub.dto.event.EventCreateDto;
+import com.nsu.musclub.dto.event.EventMemberResponseDto;
+import com.nsu.musclub.dto.event.EventMemberUpsertDto;
+import com.nsu.musclub.dto.event.EventResponseDto;
+import com.nsu.musclub.dto.event.EventTreeNodeDto;
 
 import java.util.List;
 
@@ -14,4 +18,3 @@ public interface EventRelationService {
     void detachChild(Long parentId, Long childId);
     EventTreeNodeDto getTree(Long eventId, int depth);
 }
-

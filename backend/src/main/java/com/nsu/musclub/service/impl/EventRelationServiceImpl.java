@@ -1,6 +1,5 @@
 package com.nsu.musclub.service.impl;
 
-
 import com.nsu.musclub.domain.Event;
 import com.nsu.musclub.domain.EventMember;
 import com.nsu.musclub.domain.User;
@@ -9,6 +8,7 @@ import com.nsu.musclub.mapper.EventMapper;
 import com.nsu.musclub.repository.EventMemberRepository;
 import com.nsu.musclub.repository.EventRepository;
 import com.nsu.musclub.repository.UserRepository;
+import com.nsu.musclub.service.EventRelationService;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -19,7 +19,7 @@ import java.util.List;
 
 @Service
 @Transactional
-public class EventRelationServiceImpl {
+public class EventRelationServiceImpl implements EventRelationService {
     private final EventRepository events;
     private final UserRepository users;
     private final EventMemberRepository members;
