@@ -1,3 +1,5 @@
+import org.gradle.api.tasks.testing.Test
+
 plugins {
     id("java")
     id("org.springframework.boot") version "3.3.4"
@@ -29,6 +31,11 @@ dependencies {
     testImplementation("org.testcontainers:postgresql")
 }
 
-tasks.test {
+val testBinarySuffix = System.currentTimeMillis().toString()
+
+tasks.withType<Test>().configureEach {
     useJUnitPlatform()
+    binaryResultsDirectory.set(
+        layout.buildDirectory.dir("tmp/test-binary/$testBinarySuffix/${name}")
+    )
 }
