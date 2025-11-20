@@ -47,7 +47,7 @@ replay_pid*
 ### Spring Boot / config ###
 application-local.yml
 application-*.local.yml
-application-test.yml
+application-test.ym
 .env
 .env.*
 *.keystore
