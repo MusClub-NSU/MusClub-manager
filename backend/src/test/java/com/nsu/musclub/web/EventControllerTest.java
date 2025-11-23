@@ -310,4 +310,310 @@ class EventControllerTest extends AbstractIntegrationTest {
         mockMvc.perform(delete("/api/events/{id}", 99999L))
                 .andExpect(status().isNotFound());
     }
+
+    @Test
+    void listMembers_ShouldReturn200() throws Exception {
+        String eventResponse = mockMvc.perform(post("/api/events")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(createEventDto("Event")))
+                        .contentType(MediaType.APPLICATION_JSON))
+                .andExpect(status().isCreated())
+                .andReturn()
+                .getResponse()
+                .getContentAsString();
+        Long eventId = objectMapper.readTree(eventResponse).get("id").asLong();
+
+        String userResponse = mockMvc.perform(post("/api/users")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"username\":\"member1\",\"email\":\"member1@example.com\",\"role\":\"MEMBER\"}"))
+                .andExpect(status().isCreated())
+                .andReturn()
+                .getResponse()
+                .getContentAsString();
+        Long userId = objectMapper.readTree(userResponse).get("id").asLong();
+
+        mockMvc.perform(post("/api/events/{eventId}/members", eventId)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"userId\":" + userId + ",\"role\":\"ORGANIZER\"}"))
+                .andExpect(status().isOk());
+
+        mockMvc.perform(get("/api/events/{eventId}/members", eventId))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$").isArray())
+                .andExpect(jsonPath("$.length()", greaterThanOrEqualTo(1)))
+                .andExpect(jsonPath("$[0].userId").value(userId))
+                .andExpect(jsonPath("$[0].role").value("ORGANIZER"));
+    }
+
+    @Test
+    void listMembers_WithNonExistentEvent_ShouldReturn404() throws Exception {
+        mockMvc.perform(get("/api/events/{eventId}/members", 99999L))
+                .andExpect(status().isNotFound());
+    }
+
+    @Test
+    void upsertMember_ShouldAddMember() throws Exception {
+        String eventResponse = mockMvc.perform(post("/api/events")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(createEventDto("Event"))))
+                .andExpect(status().isCreated())
+                .andReturn()
+                .getResponse()
+                .getContentAsString();
+        Long eventId = objectMapper.readTree(eventResponse).get("id").asLong();
+
+        String userResponse = mockMvc.perform(post("/api/users")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"username\":\"member1\",\"email\":\"member1@example.com\",\"role\":\"MEMBER\"}"))
+                .andExpect(status().isCreated())
+                .andReturn()
+                .getResponse()
+                .getContentAsString();
+        Long userId = objectMapper.readTree(userResponse).get("id").asLong();
+
+        mockMvc.perform(post("/api/events/{eventId}/members", eventId)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"userId\":" + userId + ",\"role\":\"PERFORMER\"}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.userId").value(userId))
+                .andExpect(jsonPath("$.role").value("PERFORMER"));
+    }
+
+    @Test
+    void upsertMember_ShouldUpdateMember() throws Exception {
+        String eventResponse = mockMvc.perform(post("/api/events")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(createEventDto("Event"))))
+                .andExpect(status().isCreated())
+                .andReturn()
+                .getResponse()
+                .getContentAsString();
+        Long eventId = objectMapper.readTree(eventResponse).get("id").asLong();
+
+        String userResponse = mockMvc.perform(post("/api/users")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"username\":\"member1\",\"email\":\"member1@example.com\",\"role\":\"MEMBER\"}"))
+                .andExpect(status().isCreated())
+                .andReturn()
+                .getResponse()
+                .getContentAsString();
+        Long userId = objectMapper.readTree(userResponse).get("id").asLong();
+
+        mockMvc.perform(post("/api/events/{eventId}/members", eventId)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"userId\":" + userId + ",\"role\":\"PERFORMER\"}"))
+                .andExpect(status().isOk());
+
+        mockMvc.perform(post("/api/events/{eventId}/members", eventId)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"userId\":" + userId + ",\"role\":\"ORGANIZER\"}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.role").value("ORGANIZER"));
+    }
+
+    @Test
+    void upsertMember_WithInvalidRole_ShouldReturn400() throws Exception {
+        String eventResponse = mockMvc.perform(post("/api/events")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(createEventDto("Event"))))
+                .andExpect(status().isCreated())
+                .andReturn()
+                .getResponse()
+                .getContentAsString();
+        Long eventId = objectMapper.readTree(eventResponse).get("id").asLong();
+
+        String userResponse = mockMvc.perform(post("/api/users")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"username\":\"member1\",\"email\":\"member1@example.com\",\"role\":\"MEMBER\"}"))
+                .andExpect(status().isCreated())
+                .andReturn()
+                .getResponse()
+                .getContentAsString();
+        Long userId = objectMapper.readTree(userResponse).get("id").asLong();
+
+        mockMvc.perform(post("/api/events/{eventId}/members", eventId)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"userId\":" + userId + ",\"role\":\"INVALID_ROLE\"}"))
+                .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    void removeMember_ShouldReturn204() throws Exception {
+        String eventResponse = mockMvc.perform(post("/api/events")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(createEventDto("Event"))))
+                .andExpect(status().isCreated())
+                .andReturn()
+                .getResponse()
+                .getContentAsString();
+        Long eventId = objectMapper.readTree(eventResponse).get("id").asLong();
+
+        String userResponse = mockMvc.perform(post("/api/users")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"username\":\"member1\",\"email\":\"member1@example.com\",\"role\":\"MEMBER\"}"))
+                .andExpect(status().isCreated())
+                .andReturn()
+                .getResponse()
+                .getContentAsString();
+        Long userId = objectMapper.readTree(userResponse).get("id").asLong();
+
+        mockMvc.perform(post("/api/events/{eventId}/members", eventId)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"userId\":" + userId + ",\"role\":\"ORGANIZER\"}"))
+                .andExpect(status().isOk());
+
+        mockMvc.perform(delete("/api/events/{eventId}/members/{userId}", eventId, userId))
+                .andExpect(status().isNoContent());
+    }
+
+    @Test
+    void createSubEvent_ShouldReturn201() throws Exception {
+        String eventResponse = mockMvc.perform(post("/api/events")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(createEventDto("Parent Event"))))
+                .andExpect(status().isCreated())
+                .andReturn()
+                .getResponse()
+                .getContentAsString();
+        Long parentId = objectMapper.readTree(eventResponse).get("id").asLong();
+
+        EventCreateDto subEventDto = new EventCreateDto();
+        subEventDto.setTitle("Sub Event");
+        subEventDto.setStartTime(futureTime().plusDays(2));
+
+        mockMvc.perform(post("/api/events/{parentId}/subevents", parentId)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(subEventDto)))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.title").value("Sub Event"));
+    }
+
+    @Test
+    void attachChild_ShouldReturn204() throws Exception {
+        String parentResponse = mockMvc.perform(post("/api/events")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(createEventDto("Parent"))))
+                .andExpect(status().isCreated())
+                .andReturn()
+                .getResponse()
+                .getContentAsString();
+        Long parentId = objectMapper.readTree(parentResponse).get("id").asLong();
+
+        String childResponse = mockMvc.perform(post("/api/events")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(createEventDto("Child"))))
+                .andExpect(status().isCreated())
+                .andReturn()
+                .getResponse()
+                .getContentAsString();
+        Long childId = objectMapper.readTree(childResponse).get("id").asLong();
+
+        mockMvc.perform(post("/api/events/{parentId}/subevents/{childId}", parentId, childId))
+                .andExpect(status().isNoContent());
+    }
+
+    @Test
+    void attachChild_WithCycle_ShouldReturn400() throws Exception {
+        String parentResponse = mockMvc.perform(post("/api/events")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(createEventDto("Parent"))))
+                .andExpect(status().isCreated())
+                .andReturn()
+                .getResponse()
+                .getContentAsString();
+        Long parentId = objectMapper.readTree(parentResponse).get("id").asLong();
+
+        String childResponse = mockMvc.perform(post("/api/events")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(createEventDto("Child"))))
+                .andExpect(status().isCreated())
+                .andReturn()
+                .getResponse()
+                .getContentAsString();
+        Long childId = objectMapper.readTree(childResponse).get("id").asLong();
+
+        mockMvc.perform(post("/api/events/{parentId}/subevents/{childId}", parentId, childId))
+                .andExpect(status().isNoContent());
+
+        mockMvc.perform(post("/api/events/{parentId}/subevents/{childId}", childId, parentId))
+                .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    void detachChild_ShouldReturn204() throws Exception {
+        String parentResponse = mockMvc.perform(post("/api/events")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(createEventDto("Parent"))))
+                .andExpect(status().isCreated())
+                .andReturn()
+                .getResponse()
+                .getContentAsString();
+        Long parentId = objectMapper.readTree(parentResponse).get("id").asLong();
+
+        EventCreateDto childDto = new EventCreateDto();
+        childDto.setTitle("Child");
+        childDto.setStartTime(futureTime().plusDays(2));
+        String childResponse = mockMvc.perform(post("/api/events/{parentId}/subevents", parentId)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(childDto)))
+                .andExpect(status().isCreated())
+                .andReturn()
+                .getResponse()
+                .getContentAsString();
+        Long childId = objectMapper.readTree(childResponse).get("id").asLong();
+
+        mockMvc.perform(delete("/api/events/{parentId}/subevents/{childId}", parentId, childId))
+                .andExpect(status().isNoContent());
+    }
+
+    @Test
+    void getTree_ShouldReturn200() throws Exception {
+        String eventResponse = mockMvc.perform(post("/api/events")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(createEventDto("Root Event"))))
+                .andExpect(status().isCreated())
+                .andReturn()
+                .getResponse()
+                .getContentAsString();
+        Long eventId = objectMapper.readTree(eventResponse).get("id").asLong();
+
+        EventCreateDto childDto = new EventCreateDto();
+        childDto.setTitle("Child Event");
+        childDto.setStartTime(futureTime().plusDays(2));
+        mockMvc.perform(post("/api/events/{parentId}/subevents", eventId)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(childDto)))
+                .andExpect(status().isCreated());
+
+        mockMvc.perform(get("/api/events/{eventId}/tree", eventId)
+                        .param("depth", "3"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.id").value(eventId))
+                .andExpect(jsonPath("$.title").value("Root Event"))
+                .andExpect(jsonPath("$.children").isArray())
+                .andExpect(jsonPath("$.children.length()", greaterThanOrEqualTo(1)));
+    }
+
+    @Test
+    void getTree_WithDefaultDepth_ShouldReturn200() throws Exception {
+        String eventResponse = mockMvc.perform(post("/api/events")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(createEventDto("Root Event"))))
+                .andExpect(status().isCreated())
+                .andReturn()
+                .getResponse()
+                .getContentAsString();
+        Long eventId = objectMapper.readTree(eventResponse).get("id").asLong();
+
+        mockMvc.perform(get("/api/events/{eventId}/tree", eventId))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.id").value(eventId));
+    }
+
+    private EventCreateDto createEventDto(String title) {
+        EventCreateDto dto = new EventCreateDto();
+        dto.setTitle(title);
+        dto.setStartTime(futureTime());
+        return dto;
+    }
 }
