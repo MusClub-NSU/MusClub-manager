@@ -8,12 +8,6 @@ import java.util.Objects;
 @Entity
 @Table(name = "event_members")
 public class EventMember {
-    public enum Role {
-        ORGANIZER,
-        PERFORMER,
-        VOLUNTEER
-    }
-
     public static class Pk implements Serializable {
         @Column(name = "event_id")
         private Long eventId;
@@ -61,9 +55,8 @@ public class EventMember {
     @JoinColumn(name = "user_id", nullable = false)
     private User user;
 
-    @Enumerated(EnumType.STRING)
-    @Column(nullable = false, length = 32)
-    private Role role = Role.PERFORMER;
+    @Column(nullable = false, length = 64)
+    private String role;
 
     @Column(name = "added_at", nullable = false)
     private OffsetDateTime addedAt = OffsetDateTime.now();
@@ -92,11 +85,11 @@ public class EventMember {
         this.user = user;
     }
 
-    public Role getRole() {
+    public String getRole() {
         return role;
     }
-
-    public void setRole(Role role) {
+ 
+    public void setRole(String role) {
         this.role = role;
     }
 

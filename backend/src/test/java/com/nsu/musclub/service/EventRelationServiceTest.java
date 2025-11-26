@@ -147,15 +147,15 @@ class EventRelationServiceTest extends AbstractIntegrationTest {
     }
 
     @Test
-    void upsertMember_WithInvalidRole_ShouldThrow400() {
+    void upsertMember_WithCustomRole_ShouldSucceed() {
         EventMemberUpsertDto dto = new EventMemberUpsertDto();
         dto.setUserId(userId1);
-        dto.setRole("INVALID_ROLE");
+        dto.setRole("Decorator");
 
-        ResponseStatusException exception = assertThrows(ResponseStatusException.class, () -> {
-            relationService.upsertMember(eventId, dto);
-        });
-        assertEquals(HttpStatus.BAD_REQUEST, exception.getStatusCode());
+        EventMemberResponseDto result = relationService.upsertMember(eventId, dto);
+
+        assertEquals(userId1, result.getUserId());
+        assertEquals("Decorator", result.getRole());
     }
 
     @Test

@@ -39,7 +39,7 @@ public class EventRelationServiceImpl implements EventRelationService {
             dto.setUserId(em.getUser().getId());
             dto.setUsername(em.getUser().getUsername());
             dto.setEmail(em.getUser().getEmail());
-            dto.setRole(em.getRole().name());
+            dto.setRole(em.getRole());
             dto.setAddedAt(em.getAddedAt());
             return dto;
         }).toList();
@@ -60,21 +60,22 @@ public class EventRelationServiceImpl implements EventRelationService {
             return x;
         });
 
-        EventMember.Role role;
-        try {
-            role = EventMember.Role.valueOf(dto.getRole());
-        } catch (IllegalArgumentException e) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Invalid role");
+        String role = dto.getRole();
+        if (role == null || role.isBlank()) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Role must not be blank");
+        }
+        if (role.length() > 64) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Role is too long");
         }
 
-        em.setRole(role);
+        em.setRole(role.trim());
         var saved = members.save(em);
 
         var out = new EventMemberResponseDto();
         out.setUserId(saved.getUser().getId());
         out.setUsername(saved.getUser().getUsername());
         out.setEmail(saved.getUser().getEmail());
-        out.setRole(saved.getRole().name());
+        out.setRole(saved.getRole());
         out.setAddedAt(saved.getAddedAt());
         return out;
     }

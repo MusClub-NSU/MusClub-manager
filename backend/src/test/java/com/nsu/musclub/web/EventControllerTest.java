@@ -412,7 +412,7 @@ class EventControllerTest extends AbstractIntegrationTest {
     }
 
     @Test
-    void upsertMember_WithInvalidRole_ShouldReturn400() throws Exception {
+    void upsertMember_WithCustomRole_ShouldReturn200() throws Exception {
         String eventResponse = mockMvc.perform(post("/api/events")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(createEventDto("Event"))))
@@ -433,8 +433,9 @@ class EventControllerTest extends AbstractIntegrationTest {
 
         mockMvc.perform(post("/api/events/{eventId}/members", eventId)
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"userId\":" + userId + ",\"role\":\"INVALID_ROLE\"}"))
-                .andExpect(status().isBadRequest());
+                        .content("{\"userId\":" + userId + ",\"role\":\"装饰工\"}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.role").value("装饰工"));
     }
 
     @Test
