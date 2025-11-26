@@ -1,7 +1,7 @@
 'use client';
 
 import { useUsers } from '../../hooks/useApi';
-import { Button, Card, Text, Loader, Icon } from '@gravity-ui/uikit';
+import { Button, Card, Text, Loader, Icon, Link} from '@gravity-ui/uikit';
 import { Plus, Pencil, TrashBin, Xmark } from '@gravity-ui/icons';
 import { useState } from 'react';
 import { User } from '../../types/api';
@@ -146,7 +146,14 @@ export default function ParticipantsPage() {
                             <tbody>
                                 {users.map((user) => (
                                     <tr key={user.id} className="border-t border-[--foreground]/10">
-                                        <td className="px-4 py-3 font-medium">{user.username}</td>
+                                        <td className="px-4 py-3 font-medium">
+                                            <Link
+                                                view="normal"
+                                                href={`/participants/${user.id}`}
+                                            >
+                                                {user.username}
+                                            </Link>
+                                        </td>
                                         <td className="px-4 py-3 text-[--foreground]/70">{user.email}</td>
                                         <td className="px-4 py-3">
                                             <span className={`px-2 py-1 rounded text-sm ${
