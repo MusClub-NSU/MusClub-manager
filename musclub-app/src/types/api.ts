@@ -64,3 +64,17 @@ export interface Page<T> {
   numberOfElements: number;
 }
 
+// Типы для участников событий
+export interface EventMember {
+  userId: number;
+  username: string;
+  email: string;
+  role: string;
+  addedAt: string;
+}
+
+export interface EventMemberUpsertDto {
+  userId: number;
+  role: string;
+}
+
