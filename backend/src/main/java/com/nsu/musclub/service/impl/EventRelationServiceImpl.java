@@ -71,10 +71,11 @@ public class EventRelationServiceImpl implements EventRelationService {
         em.setRole(role.trim());
         var saved = members.save(em);
 
+        // Используем уже загруженные объекты user и event для избежания проблем с lazy loading
         var out = new EventMemberResponseDto();
-        out.setUserId(saved.getUser().getId());
-        out.setUsername(saved.getUser().getUsername());
-        out.setEmail(saved.getUser().getEmail());
+        out.setUserId(user.getId());
+        out.setUsername(user.getUsername());
+        out.setEmail(user.getEmail());
         out.setRole(saved.getRole());
         out.setAddedAt(saved.getAddedAt());
         return out;

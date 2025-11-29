@@ -15,6 +15,7 @@ spring:
     enabled: true
     schemas: public
     default-schema: public
+    validate-on-migrate: false
 
 server:
   port: 8080
