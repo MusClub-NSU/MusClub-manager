@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react';
 import { useRouter, useParams } from 'next/navigation';
 import { Card, Button, Text, Icon, Loader, Select} from '@gravity-ui/uikit';
-import { Person, Envelope, Calendar, Tags, Pencil } from '@gravity-ui/icons';
+import { Person, LogoTelegram, Calendar, Tags, Pencil } from '@gravity-ui/icons';
 import { useUsers } from '../../../hooks/useApi';
 import { useSidebar } from '../../context/SidebarContext';
 
@@ -144,7 +144,7 @@ export default function UserDetailsPage() {
 
                         {/* Email */}
                         <div className="flex items-center gap-3 w-full">
-                            <Icon data={Envelope} size={20} className="shrink-0"/>
+                            <Icon data={LogoTelegram} size={20} className="shrink-0"/>
                             {isEditing ? (
                                 <input
                                     type="email"
