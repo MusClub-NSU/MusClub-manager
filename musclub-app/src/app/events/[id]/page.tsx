@@ -64,6 +64,14 @@ export default function EventDetailsPage() {
 
     // Загрузка участников события
     useEffect(() => {
+        // Сбрасываем состояние при переключении между мероприятиями
+        setEventMembers([]);
+        setSelectedUserId(null);
+        setShowAddPerson(null);
+        setShowAddRole(false);
+        setNewRoleName('');
+        setCreatedRoles([]);
+        
         if (event?.id) {
             loadEventMembers();
         }
