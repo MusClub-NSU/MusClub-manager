@@ -1,4 +1,4 @@
-import { User, UserCreateDto, UserUpdateDto, Event, EventCreateDto, EventUpdateDto, Page, Pageable } from '../types/api';
+import { User, UserCreateDto, UserUpdateDto, Event, EventCreateDto, EventUpdateDto, Page, Pageable, EventMember, EventMemberUpsertDto } from '../types/api';
 
 const API_BASE_URL = 'http://localhost:8080/api';
 
@@ -14,7 +14,29 @@ class ApiClient {
     });
 
     if (!response.ok) {
-      throw new Error(`HTTP error! status: ${response.status}`);
+      // Пытаемся извлечь сообщение об ошибке из ответа
+      let errorMessage = `HTTP error! status: ${response.status}`;
+      try {
+        const errorData = await response.json();
+        if (errorData.message) {
+          errorMessage = errorData.message;
+        } else if (typeof errorData === 'string') {
+          errorMessage = errorData;
+        } else if (errorData.error) {
+          errorMessage = errorData.error;
+        }
+      } catch {
+        // Если не удалось распарсить JSON, пытаемся прочитать как текст
+        try {
+          const text = await response.text();
+          if (text) {
+            errorMessage = text;
+          }
+        } catch {
+          // Оставляем стандартное сообщение
+        }
+      }
+      throw new Error(errorMessage);
     }
 
     // Если ответ пустой (например, для DELETE запросов)
@@ -97,6 +119,24 @@ class ApiClient {
 
   async deleteEvent(id: number): Promise<void> {
     return this.request<void>(`/events/${id}`, {
+      method: 'DELETE',
+    });
+  }
+
+  // API для участников событий
+  async getEventMembers(eventId: number): Promise<EventMember[]> {
+    return this.request<EventMember[]>(`/events/${eventId}/members`);
+  }
+
+  async upsertEventMember(eventId: number, member: EventMemberUpsertDto): Promise<EventMember> {
+    return this.request<EventMember>(`/events/${eventId}/members`, {
+      method: 'POST',
+      body: JSON.stringify(member),
+    });
+  }
+
+  async removeEventMember(eventId: number, userId: number): Promise<void> {
+    return this.request<void>(`/events/${eventId}/members/${userId}`, {
       method: 'DELETE',
     });
   }

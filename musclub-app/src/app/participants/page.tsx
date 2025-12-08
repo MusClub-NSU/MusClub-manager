@@ -7,7 +7,7 @@ import { useState } from 'react';
 import { User } from '../../types/api';
 
 export default function ParticipantsPage() {
-    const { users, loading, error, createUser, updateUser, deleteUser } = useUsers({ page: 0, size: 20 });
+    const { users, loading, error, createUser, updateUser, deleteUser, refetch } = useUsers({ page: 0, size: 20 });
     const [isCreating, setIsCreating] = useState(false);
     const [editingUser, setEditingUser] = useState<User | null>(null);
     const [editFormData, setEditFormData] = useState({
@@ -17,14 +17,23 @@ export default function ParticipantsPage() {
     });
 
     const handleCreateUser = async () => {
+        setIsCreating(true);
         try {
+            // Генерируем уникальные данные для нового пользователя
+            const timestamp = Date.now();
+            const randomSuffix = Math.floor(Math.random() * 1000);
             await createUser({
-                username: 'Новый участник',
-                email: 'new@example.com',
+                username: `Новый участник ${timestamp}`,
+                email: `new-${timestamp}-${randomSuffix}@example.com`,
                 role: 'MEMBER'
             });
+            await refetch();
         } catch (err) {
-            console.error('Ошибка создания пользователя:', err);
+            const errorMessage = err instanceof Error ? err.message : 'Неизвестная ошибка';
+            console.error('Ошибка создания пользователя:', errorMessage);
+            alert(`Ошибка создания пользователя: ${errorMessage}`);
+        } finally {
+            setIsCreating(false);
         }
     };
 
