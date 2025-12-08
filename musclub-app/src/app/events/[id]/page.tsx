@@ -1,17 +1,13 @@
 'use client';
 
 import { useParams, useRouter } from 'next/navigation';
-import { Button, Icon, Text, Loader, Card} from '@gravity-ui/uikit';
+import { Button, Icon, Text, Loader, Card, Select} from '@gravity-ui/uikit';
 import { Bookmark, HandPointRight, Clock, Persons, Pencil, Check, Xmark, Plus, TrashBin, Person, ArrowUp, ArrowDown, MusicNote } from '@gravity-ui/icons';
-import React, { useState} from 'react';
+import React, { useState, useEffect} from 'react';
 import { useEvents, useUsers } from '../../../hooks/useApi';
 import { useSidebar } from '../../context/SidebarContext';
-
-interface RoleAssignment {
-    id: string;
-    roleName: string;
-    people: string[];
-}
+import { apiClient } from '../../../lib/api';
+import { EventMember } from '../../../types/api';
 
 interface TimelineEvent {
     id: string;
@@ -23,6 +19,7 @@ interface ProgramItem {
     id: string;
     title: string;
     artist?: string;
+    time?: string; // формат HH:mm
     duration?: string; // формат MM:SS или просто минуты
     notes?: string;
 }
@@ -31,24 +28,24 @@ export default function EventDetailsPage() {
     const { id } = useParams();
     const router = useRouter();
     const { events, loading, error, updateEvent } = useEvents({ page: 0, size: 100 });
-    const { users } = useUsers({ page: 0, size: 100 });
+    const { users, loading: usersLoading } = useUsers({ page: 0, size: 100 });
     const { visible } = useSidebar();
     const [activeTab, setActiveTab] = useState('assignments');
 
-    // Состояние для назначения людей
-    const [roleAssignments, setRoleAssignments] = useState<RoleAssignment[]>([]);
+    // Состояние для участников события
+    const [eventMembers, setEventMembers] = useState<EventMember[]>([]);
+    const [membersLoading, setMembersLoading] = useState(false);
     const [newRoleName, setNewRoleName] = useState('');
     const [showAddRole, setShowAddRole] = useState(false);
-    const [editingRoleId, setEditingRoleId] = useState<string | null>(null);
-    const [newPersonName, setNewPersonName] = useState('');
     const [showAddPerson, setShowAddPerson] = useState<string | null>(null);
+    const [selectedUserId, setSelectedUserId] = useState<number | null>(null);
+    const [createdRoles, setCreatedRoles] = useState<string[]>([]); // Роли, созданные но без участников
 
     // Состояние для таймлайна
     const [timelineEvents, setTimelineEvents] = useState<TimelineEvent[]>([]);
     const [showAddTimelineEvent, setShowAddTimelineEvent] = useState(false);
     const [editingTimelineEventId, setEditingTimelineEventId] = useState<string | null>(null);
-    const [newTimelineHour, setNewTimelineHour] = useState('09');
-    const [newTimelineMinute, setNewTimelineMinute] = useState('00');
+    const [newTimelineTime, setNewTimelineTime] = useState('09:00');
     const [newTimelineDescription, setNewTimelineDescription] = useState('');
     
     // Состояние для концертной программы
@@ -57,15 +54,54 @@ export default function EventDetailsPage() {
     const [editingProgramItemId, setEditingProgramItemId] = useState<string | null>(null);
     const [newProgramTitle, setNewProgramTitle] = useState('');
     const [newProgramArtist, setNewProgramArtist] = useState('');
+    const [newProgramTime, setNewProgramTime] = useState('');
     const [newProgramDuration, setNewProgramDuration] = useState('');
     const [newProgramNotes, setNewProgramNotes] = useState('');
     
-    // Генерация опций для часов и минут
-    const hours = Array.from({ length: 24 }, (_, i) => i.toString().padStart(2, '0'));
-    const minutes = ['00', '15', '30', '45'];
 
     const [isEditing, setIsEditing] = useState(false);
     const event = events.find((e) => e.id === Number(id));
+
+    // Загрузка участников события
+    useEffect(() => {
+        // Сбрасываем состояние при переключении между мероприятиями
+        setEventMembers([]);
+        setSelectedUserId(null);
+        setShowAddPerson(null);
+        setShowAddRole(false);
+        setNewRoleName('');
+        setCreatedRoles([]);
+        
+        if (event?.id) {
+            loadEventMembers();
+        }
+    }, [event?.id]);
+
+    const loadEventMembers = async () => {
+        if (!event?.id) return;
+        try {
+            setMembersLoading(true);
+            const members = await apiClient.getEventMembers(event.id);
+            setEventMembers(members);
+        } catch (err) {
+            console.error('Ошибка загрузки участников:', err);
+        } finally {
+            setMembersLoading(false);
+        }
+    };
+
+    // Группировка участников по ролям
+    const membersByRole = eventMembers.reduce((acc, member) => {
+        if (!acc[member.role]) {
+            acc[member.role] = [];
+        }
+        acc[member.role].push(member);
+        return acc;
+    }, {} as Record<string, EventMember[]>);
+
+    // Объединяем роли из бекенда и созданные локально (но еще без участников)
+    const allRoleNames = [...new Set([...Object.keys(membersByRole), ...createdRoles])];
+    const roleNames = allRoleNames;
 
     const toLocalInputFormat = (isoString: string) => {
         if (!isoString) return '';
@@ -144,48 +180,59 @@ export default function EventDetailsPage() {
         }
     };
 
-    // Функции для работы с ролями
-    const handleAddRole = () => {
-        if (newRoleName.trim()) {
-            const newRole: RoleAssignment = {
-                id: Date.now().toString(),
-                roleName: newRoleName.trim(),
-                people: []
-            };
-            setRoleAssignments([...roleAssignments, newRole]);
-            setNewRoleName('');
+    // Функции для работы с ролями и участниками
+    const handleCreateRole = () => {
+        if (!newRoleName.trim()) return;
+        const roleName = newRoleName.trim();
+        if (!createdRoles.includes(roleName) && !roleNames.includes(roleName)) {
+            setCreatedRoles([...createdRoles, roleName]);
             setShowAddRole(false);
+            setShowAddPerson(roleName);
+            setNewRoleName('');
         }
     };
 
-    const handleDeleteRole = (roleId: string) => {
-        setRoleAssignments(roleAssignments.filter(r => r.id !== roleId));
-    };
-
-    const handleAddPersonToRole = (roleId: string) => {
-        if (newPersonName.trim()) {
-            setRoleAssignments(roleAssignments.map(role => 
-                role.id === roleId 
-                    ? { ...role, people: [...role.people, newPersonName.trim()] }
-                    : role
-            ));
-            setNewPersonName('');
+    const handleAddPersonToRole = async (roleName: string) => {
+        if (!event?.id || !selectedUserId) return;
+        try {
+            await apiClient.upsertEventMember(event.id, {
+                userId: selectedUserId,
+                role: roleName.trim()
+            });
+            // Удаляем роль из списка созданных, так как теперь она есть в бекенде
+            setCreatedRoles(createdRoles.filter(r => r !== roleName));
+            await loadEventMembers();
+            setSelectedUserId(null);
             setShowAddPerson(null);
+            setNewRoleName('');
+        } catch (err) {
+            console.error('Ошибка добавления участника:', err);
         }
     };
 
-    const handleDeletePerson = (roleId: string, personIndex: number) => {
-        setRoleAssignments(roleAssignments.map(role =>
-            role.id === roleId
-                ? { ...role, people: role.people.filter((_, idx) => idx !== personIndex) }
-                : role
-        ));
+    const handleRemoveMember = async (userId: number) => {
+        if (!event?.id) return;
+        try {
+            await apiClient.removeEventMember(event.id, userId);
+            await loadEventMembers();
+        } catch (err) {
+            console.error('Ошибка удаления участника:', err);
+        }
+    };
+
+    const handleUserClick = (userId: number) => {
+        router.push(`/participants/${userId}`);
+    };
+
+    // Получение доступных пользователей для выбора (исключая уже назначенных)
+    const getAvailableUsers = (roleName: string) => {
+        const assignedUserIds = membersByRole[roleName]?.map(m => m.userId) || [];
+        return users.filter(user => !assignedUserIds.includes(user.id));
     };
 
     // Функции для работы с таймлайном
     const handleOpenAddForm = () => {
-        setNewTimelineHour('09');
-        setNewTimelineMinute('00');
+        setNewTimelineTime('09:00');
         setNewTimelineDescription('');
         setEditingTimelineEventId(null);
         setShowAddTimelineEvent(true);
@@ -194,9 +241,7 @@ export default function EventDetailsPage() {
     const handleEditTimelineEvent = (eventId: string) => {
         const event = timelineEvents.find(e => e.id === eventId);
         if (event) {
-            const [hour, minute] = event.time.split(':');
-            setNewTimelineHour(hour);
-            setNewTimelineMinute(minute);
+            setNewTimelineTime(event.time);
             setNewTimelineDescription(event.description);
             setEditingTimelineEventId(eventId);
             setShowAddTimelineEvent(true);
@@ -204,7 +249,7 @@ export default function EventDetailsPage() {
     };
 
     const handleSaveTimelineEvent = () => {
-        const timeString = `${newTimelineHour}:${newTimelineMinute}`;
+        const timeString = newTimelineTime;
         if (newTimelineDescription.trim()) {
             if (editingTimelineEventId) {
                 // Обновляем существующее событие
@@ -236,8 +281,7 @@ export default function EventDetailsPage() {
                 });
                 setTimelineEvents(sorted);
             }
-            setNewTimelineHour('09');
-            setNewTimelineMinute('00');
+            setNewTimelineTime('09:00');
             setNewTimelineDescription('');
             setEditingTimelineEventId(null);
             setShowAddTimelineEvent(false);
@@ -252,6 +296,7 @@ export default function EventDetailsPage() {
     const handleOpenAddProgramForm = () => {
         setNewProgramTitle('');
         setNewProgramArtist('');
+        setNewProgramTime('');
         setNewProgramDuration('');
         setNewProgramNotes('');
         setEditingProgramItemId(null);
@@ -263,6 +308,7 @@ export default function EventDetailsPage() {
         if (item) {
             setNewProgramTitle(item.title);
             setNewProgramArtist(item.artist || '');
+            setNewProgramTime(item.time || '');
             setNewProgramDuration(item.duration || '');
             setNewProgramNotes(item.notes || '');
             setEditingProgramItemId(itemId);
@@ -280,6 +326,7 @@ export default function EventDetailsPage() {
                             ...item, 
                             title: newProgramTitle.trim(),
                             artist: newProgramArtist.trim() || undefined,
+                            time: newProgramTime.trim() || undefined,
                             duration: newProgramDuration.trim() || undefined,
                             notes: newProgramNotes.trim() || undefined
                         }
@@ -291,6 +338,7 @@ export default function EventDetailsPage() {
                     id: Date.now().toString(),
                     title: newProgramTitle.trim(),
                     artist: newProgramArtist.trim() || undefined,
+                    time: newProgramTime.trim() || undefined,
                     duration: newProgramDuration.trim() || undefined,
                     notes: newProgramNotes.trim() || undefined
                 };
@@ -298,6 +346,7 @@ export default function EventDetailsPage() {
             }
             setNewProgramTitle('');
             setNewProgramArtist('');
+            setNewProgramTime('');
             setNewProgramDuration('');
             setNewProgramNotes('');
             setEditingProgramItemId(null);
@@ -433,158 +482,203 @@ export default function EventDetailsPage() {
                                 <Button
                                     view="action"
                                     size="m"
-                                    onClick={() => setShowAddRole(true)}
+                                    onClick={() => {
+                                        setShowAddRole(true);
+                                        setNewRoleName('');
+                                    }}
                                 >
                                     <span className="flex items-center justify-center gap-2">
-                                        <Plus size={16}/>
-                                        <span className="hidden sm:inline">Добавить роль</span>
-                                        <span className="sm:hidden">Добавить</span>
+                                        <Icon data={Plus} size={16}/>
+                                        <span className="hidden sm:inline">Создать роль</span>
+                                        <span className="sm:hidden">Роль</span>
                                     </span>
                                 </Button>
                             )}
                         </div>
 
                         {showAddRole && (
-                            <Card className="p-4 mb-4">
-                                <div className="flex flex-col sm:flex-row gap-2 sm:items-center">
-                                    <input
-                                        type="text"
-                                        placeholder="Название роли (например: Режиссер)"
-                                        value={newRoleName}
-                                        onChange={(e) => setNewRoleName(e.target.value)}
-                                        onKeyPress={(e) => e.key === 'Enter' && handleAddRole()}
-                                        className="flex-1 px-3 sm:px-4 py-2 border border-[--foreground]/20 rounded-lg bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm sm:text-base"
-                                        autoFocus
-                                    />
-                                    <div className="flex gap-2">
-                                        <Button
-                                            view="action"
-                                            onClick={handleAddRole}
-                                            disabled={!newRoleName.trim()}
-                                            className="flex-1 sm:flex-initial"
-                                        >
-                                            Добавить
-                                        </Button>
-                                        <Button
-                                            view="flat"
-                                            onClick={() => {
-                                                setShowAddRole(false);
-                                                setNewRoleName('');
+                            <Card className="p-4 mb-4 border-2 border-blue-300">
+                                <div className="flex flex-col gap-3">
+                                    <Text variant="subheader-2" className="font-semibold">Шаг 1: Создать роль</Text>
+                                    <div className="flex flex-col sm:flex-row gap-2">
+                                        <input
+                                            type="text"
+                                            placeholder="Название роли (например: Режиссер)"
+                                            value={newRoleName}
+                                            onChange={(e) => setNewRoleName(e.target.value)}
+                                            onKeyPress={(e) => {
+                                                if (e.key === 'Enter' && newRoleName.trim()) {
+                                                    handleCreateRole();
+                                                }
                                             }}
-                                        >
-                                            <Icon data={Xmark} size={16}/>
-                                        </Button>
+                                            className="flex-1 px-3 py-2 border border-[--foreground]/20 rounded-lg bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm sm:text-base"
+                                            autoFocus
+                                        />
+                                        <div className="flex gap-2">
+                                            <Button
+                                                view="action"
+                                                onClick={handleCreateRole}
+                                                disabled={!newRoleName.trim()}
+                                                className="flex-1 sm:flex-initial"
+                                            >
+                                                Создать роль
+                                            </Button>
+                                            <Button
+                                                view="flat"
+                                                onClick={() => {
+                                                    setShowAddRole(false);
+                                                    setNewRoleName('');
+                                                }}
+                                            >
+                                                <Icon data={Xmark} size={16}/>
+                                            </Button>
+                                        </div>
                                     </div>
                                 </div>
                             </Card>
                         )}
 
-                        {roleAssignments.length === 0 ? (
+                        {membersLoading ? (
                             <Card className="p-8 text-center">
-                                <Text color="secondary">
-                                    Роли не назначены. Добавьте первую роль, нажав кнопку выше.
+                                <Loader size="m" />
+                                <Text color="secondary" className="mt-2">Загрузка участников...</Text>
+                            </Card>
+                        ) : roleNames.length === 0 ? (
+                            <Card className="p-8 text-center">
+                                <Text color="secondary" className="mb-4">
+                                    Роли не назначены. Создайте первую роль, нажав кнопку выше.
                                 </Text>
                             </Card>
                         ) : (
                             <div className="space-y-4">
-                                {roleAssignments.map((role) => (
-                                    <Card key={role.id} className="p-4 sm:p-6">
-                                        <div className="flex flex-col sm:flex-row sm:justify-between sm:items-start gap-3 sm:gap-0 mb-4">
-                                            <div className="flex flex-wrap items-center gap-2 sm:gap-3">
-                                                <Text variant="subheader-2" className="font-semibold text-base sm:text-lg">
-                                                    {role.roleName}
-                                                </Text>
-                                                <Text color="secondary" className="text-xs sm:text-sm">
-                                                    ({role.people.length} {role.people.length === 1 ? 'человек' : 'человек'})
-                                                </Text>
-                                            </div>
-                                            <div className="flex gap-2">
-                                                {showAddPerson !== role.id && (
-                                                    <Button
-                                                        view="flat"
-                                                        size="s"
-                                                        onClick={() => setShowAddPerson(role.id)}
-                                                    >
-                                                        <span className="flex items-center gap-1">
-                                                            <Plus size={14}/>
-                                                            <span className="hidden sm:inline">Добавить человека</span>
-                                                            <span className="sm:hidden">Добавить</span>
-                                                        </span>
-                                                    </Button>
-                                                )}
-                                                <Button
-                                                    view="flat"
-                                                    size="s"
-                                                    onClick={() => handleDeleteRole(role.id)}
-                                                >
-                                                    <Icon data={TrashBin} size={14}/>
-                                                </Button>
-                                            </div>
-                                        </div>
-
-                                        {showAddPerson === role.id && (
-                                            <div className="flex flex-col sm:flex-row gap-2 mb-4 p-3 bg-[--g-color-base-generic-hover] rounded-lg">
-                                                <input
-                                                    type="text"
-                                                    placeholder="Имя человека"
-                                                    value={newPersonName}
-                                                    onChange={(e) => setNewPersonName(e.target.value)}
-                                                    onKeyPress={(e) => e.key === 'Enter' && handleAddPersonToRole(role.id)}
-                                                    className="flex-1 px-3 py-2 border border-[--foreground]/20 rounded bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm sm:text-base"
-                                                    autoFocus
-                                                />
-                                                <div className="flex gap-2">
-                                                    <Button
-                                                        view="action"
-                                                        size="s"
-                                                        onClick={() => handleAddPersonToRole(role.id)}
-                                                        disabled={!newPersonName.trim()}
-                                                        className="flex-1 sm:flex-initial"
-                                                    >
-                                                        Добавить
-                                                    </Button>
-                                                    <Button
-                                                        view="flat"
-                                                        size="s"
-                                                        onClick={() => {
-                                                            setShowAddPerson(null);
-                                                            setNewPersonName('');
-                                                        }}
-                                                    >
-                                                        <Icon data={Xmark} size={14}/>
-                                                    </Button>
+                                {roleNames.map((roleName) => {
+                                    const members = membersByRole[roleName] || [];
+                                    const isNewRole = createdRoles.includes(roleName) && members.length === 0;
+                                    const availableUsers = isNewRole 
+                                        ? users 
+                                        : getAvailableUsers(roleName);
+                                    return (
+                                        <Card key={roleName} className={`p-4 sm:p-6 ${isNewRole ? 'border-2 border-blue-300' : ''}`}>
+                                            <div className="flex flex-col sm:flex-row sm:justify-between sm:items-start gap-3 sm:gap-0 mb-4">
+                                                <div className="flex flex-wrap items-center gap-2 sm:gap-3">
+                                                    <Text variant="subheader-2" className="font-semibold text-base sm:text-lg">
+                                                        {roleName}
+                                                    </Text>
+                                                    {isNewRole ? (
+                                                        <Text color="warning" className="text-xs sm:text-sm font-medium">
+                                                            (Роль создана, назначьте участника)
+                                                        </Text>
+                                                    ) : (
+                                                        <Text color="secondary" className="text-xs sm:text-sm">
+                                                            ({members.length} {members.length === 1 ? 'человек' : members.length < 5 ? 'человека' : 'человек'})
+                                                        </Text>
+                                                    )}
                                                 </div>
-                                            </div>
-                                        )}
-
-                                        {role.people.length > 0 ? (
-                                            <div className="space-y-2">
-                                                {role.people.map((person, idx) => (
-                                                    <div
-                                                        key={idx}
-                                                        className="flex justify-between items-center p-3 bg-[--g-color-base-generic-hover] rounded-lg"
-                                                    >
-                                                        <div className="flex items-center gap-2">
-                                                            <Icon data={Person} size={16}/>
-                                                            <Text>{person}</Text>
-                                                        </div>
+                                                <div className="flex gap-2">
+                                                    {showAddPerson !== roleName && (
                                                         <Button
                                                             view="flat"
                                                             size="s"
-                                                            onClick={() => handleDeletePerson(role.id, idx)}
+                                                            onClick={() => {
+                                                                setShowAddPerson(roleName);
+                                                                setSelectedUserId(null);
+                                                            }}
+                                                            disabled={usersLoading || users.length === 0}
                                                         >
-                                                            <Icon data={TrashBin} size={14}/>
+                                                            <span className="flex items-center gap-1">
+                                                                <Icon data={Plus} size={14}/>
+                                                                <span className="hidden sm:inline">{isNewRole ? 'Назначить участника' : 'Добавить участника'}</span>
+                                                                <span className="sm:hidden">Добавить</span>
+                                                            </span>
                                                         </Button>
-                                                    </div>
-                                                ))}
+                                                    )}
+                                                </div>
                                             </div>
-                                        ) : (
-                                            <Text color="secondary" className="text-sm italic">
-                                                Пока никто не назначен на эту роль
-                                            </Text>
-                                        )}
-                                    </Card>
-                                ))}
+
+                                            {showAddPerson === roleName && (
+                                                <div className="flex flex-col gap-3 mb-4 p-3 bg-[--g-color-base-generic-hover] rounded-lg">
+                                                    {isNewRole && (
+                                                        <Text variant="body-2" color="secondary" className="mb-1">
+                                                            Шаг 2: Назначьте участника на роль "{roleName}"
+                                                        </Text>
+                                                    )}
+                                                    <div className="flex flex-col sm:flex-row gap-2">
+                                                        <Select
+                                                            value={selectedUserId ? [selectedUserId.toString()] : []}
+                                                            onUpdate={(value) => setSelectedUserId(value[0] ? Number(value[0]) : null)}
+                                                            placeholder="Выберите участника"
+                                                            size="m"
+                                                            className="flex-1"
+                                                            disabled={usersLoading || availableUsers.length === 0}
+                                                            options={availableUsers.map(user => ({
+                                                                value: user.id.toString(),
+                                                                content: `${user.username} (${user.email})`
+                                                            }))}
+                                                        />
+                                                        <div className="flex gap-2">
+                                                            <Button
+                                                                view="action"
+                                                                size="s"
+                                                                onClick={() => handleAddPersonToRole(roleName)}
+                                                                disabled={!selectedUserId}
+                                                                className="flex-1 sm:flex-initial"
+                                                            >
+                                                                {isNewRole ? 'Назначить' : 'Добавить'}
+                                                            </Button>
+                                                            <Button
+                                                                view="flat"
+                                                                size="s"
+                                                                onClick={() => {
+                                                                    setShowAddPerson(null);
+                                                                    setSelectedUserId(null);
+                                                                    if (isNewRole) {
+                                                                        setCreatedRoles(createdRoles.filter(r => r !== roleName));
+                                                                    }
+                                                                }}
+                                                            >
+                                                                <Icon data={Xmark} size={14}/>
+                                                            </Button>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            )}
+
+                                            {members.length > 0 ? (
+                                                <div className="space-y-2">
+                                                    {members.map((member) => (
+                                                        <div
+                                                            key={member.userId}
+                                                            className="flex justify-between items-center p-3 bg-[--g-color-base-generic-hover] rounded-lg hover:bg-[--g-color-base-generic-active] transition-colors cursor-pointer"
+                                                            onClick={() => handleUserClick(member.userId)}
+                                                        >
+                                                            <div className="flex items-center gap-2 flex-1">
+                                                                <Icon data={Person} size={16}/>
+                                                                <div className="flex flex-col">
+                                                                    <Text className="font-medium">{member.username}</Text>
+                                                                    <Text color="secondary" className="text-xs">{member.email}</Text>
+                                                                </div>
+                                                            </div>
+                                                            <Button
+                                                                view="flat"
+                                                                size="s"
+                                                                onClick={(e) => {
+                                                                    e.stopPropagation();
+                                                                    handleRemoveMember(member.userId);
+                                                                }}
+                                                            >
+                                                                <Icon data={TrashBin} size={14}/>
+                                                            </Button>
+                                                        </div>
+                                                    ))}
+                                                </div>
+                                            ) : (
+                                                <Text color="secondary" className="text-sm italic">
+                                                    Пока никто не назначен на эту роль
+                                                </Text>
+                                            )}
+                                        </Card>
+                                    );
+                                })}
                             </div>
                         )}
                     </div>
@@ -602,7 +696,7 @@ export default function EventDetailsPage() {
                                     onClick={handleOpenAddForm}
                                 >
                                     <span className="flex items-center justify-center gap-2">
-                                        <Plus size={16} />
+                                        <Icon data={Plus} size={16} />
                                         <span>Добавить событие</span>
                                     </span>
                                 </Button>
@@ -618,31 +712,12 @@ export default function EventDetailsPage() {
                                             <span className="hidden sm:inline">Время:</span>
                                             <span className="sm:hidden">Время</span>
                                         </label>
-                                        <div className="flex gap-2 flex-1">
-                                            <select
-                                                value={newTimelineHour}
-                                                onChange={(e) => setNewTimelineHour(e.target.value)}
-                                                className="flex-1 sm:flex-initial px-3 sm:px-4 py-2 sm:py-3 border-2 border-[--foreground]/20 rounded-xl bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all text-sm sm:text-base"
-                                            >
-                                                {hours.map((hour) => (
-                                                    <option key={hour} value={hour}>
-                                                        {hour}
-                                                    </option>
-                                                ))}
-                                            </select>
-                                            <span className="flex items-center text-lg sm:text-xl font-bold px-1 sm:px-2">:</span>
-                                            <select
-                                                value={newTimelineMinute}
-                                                onChange={(e) => setNewTimelineMinute(e.target.value)}
-                                                className="flex-1 sm:flex-initial px-3 sm:px-4 py-2 sm:py-3 border-2 border-[--foreground]/20 rounded-xl bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all text-sm sm:text-base"
-                                            >
-                                                {minutes.map((minute) => (
-                                                    <option key={minute} value={minute}>
-                                                        {minute}
-                                                    </option>
-                                                ))}
-                                            </select>
-                                        </div>
+                                        <input
+                                            type="time"
+                                            value={newTimelineTime}
+                                            onChange={(e) => setNewTimelineTime(e.target.value)}
+                                            className="flex-1 px-2 py-1 sm:px-3 sm:py-2 border rounded-lg bg-[--g-color-base-generic-hover] text-[--g-color-text-primary] text-sm sm:text-base focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                        />
                                     </div>
                                     <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-3">
                                         <label className="text-sm font-semibold sm:min-w-[100px]">Описание:</label>
@@ -662,8 +737,7 @@ export default function EventDetailsPage() {
                                             view="outlined"
                                             onClick={() => {
                                                 setShowAddTimelineEvent(false);
-                                                setNewTimelineHour('09');
-                                                setNewTimelineMinute('00');
+                                                setNewTimelineTime('09:00');
                                                 setNewTimelineDescription('');
                                                 setEditingTimelineEventId(null);
                                             }}
@@ -774,7 +848,7 @@ export default function EventDetailsPage() {
                                     onClick={handleOpenAddProgramForm}
                                 >
                                     <span className="flex items-center justify-center gap-2">
-                                        <Plus size={16} />
+                                        <Icon data={Plus} size={16} />
                                         <span className="hidden sm:inline">Добавить номер</span>
                                         <span className="sm:hidden">Добавить</span>
                                     </span>
@@ -808,6 +882,19 @@ export default function EventDetailsPage() {
                                         />
                                     </div>
                                     <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-3">
+                                        <label className="text-sm font-semibold sm:min-w-[100px] flex items-center gap-2">
+                                            <Icon data={Clock} size={16} />
+                                            <span className="hidden sm:inline">Время:</span>
+                                            <span className="sm:hidden">Время</span>
+                                        </label>
+                                        <input
+                                            type="time"
+                                            value={newProgramTime}
+                                            onChange={(e) => setNewProgramTime(e.target.value)}
+                                            className="flex-1 px-2 py-1 sm:px-3 sm:py-2 border rounded-lg bg-[--g-color-base-generic-hover] text-[--g-color-text-primary] text-sm sm:text-base focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                        />
+                                    </div>
+                                    <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-3">
                                         <label className="text-sm font-semibold sm:min-w-[100px]">Длительность:</label>
                                         <input
                                             type="text"
@@ -834,6 +921,7 @@ export default function EventDetailsPage() {
                                                 setShowAddProgramItem(false);
                                                 setNewProgramTitle('');
                                                 setNewProgramArtist('');
+                                                setNewProgramTime('');
                                                 setNewProgramDuration('');
                                                 setNewProgramNotes('');
                                                 setEditingProgramItemId(null);
@@ -891,9 +979,14 @@ export default function EventDetailsPage() {
                                                         )}
                                                     </div>
                                                     <div className="flex flex-wrap gap-3 text-sm sm:text-base">
+                                                        {item.time && (
+                                                            <div className="flex items-center gap-1 px-2 py-1 rounded-lg bg-purple-100 dark:bg-purple-900/30">
+                                                                <Icon data={Clock} size={14} className="text-purple-600 dark:text-purple-400" />
+                                                                <Text color="secondary" className="font-semibold text-purple-700 dark:text-purple-300">{item.time}</Text>
+                                                            </div>
+                                                        )}
                                                         {item.duration && (
                                                             <div className="flex items-center gap-1">
-                                                                <Icon data={Clock} size={14} />
                                                                 <Text color="secondary">{item.duration}</Text>
                                                             </div>
                                                         )}
