@@ -1,6 +1,5 @@
 package com.nsu.musclub.dto.event;
 
-import jakarta.validation.constraints.Future;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Size;
 
@@ -14,10 +13,7 @@ public class EventCreateDto {
     @Size(max = 1000)
     private String description;
 
-    @Future
     private OffsetDateTime startTime;
-
-    @Future
     private OffsetDateTime endTime;
 
     @Size(max = 255)
