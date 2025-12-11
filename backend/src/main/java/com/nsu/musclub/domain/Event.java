@@ -1,6 +1,7 @@
 package com.nsu.musclub.domain;
 
 import jakarta.persistence.*;
+
 import java.time.OffsetDateTime;
 
 @Entity
@@ -27,6 +28,17 @@ public class Event {
 
     @Column(name = "created_at", nullable = false)
     private OffsetDateTime createdAt = OffsetDateTime.now();
+
+    @Column(name = "ai_description", columnDefinition = "TEXT")
+    private String aiDescription;
+
+    public String getAiDescription() {
+        return aiDescription;
+    }
+
+    public void setAiDescription(String aiDescription) {
+        this.aiDescription = aiDescription;
+    }
 
     public Long getId() {
         return id;

@@ -31,6 +31,7 @@ public class EventMapper {
         dto.setEndTime(event.getEndTime());
         dto.setVenue(event.getVenue());
         dto.setCreatedAt(event.getCreatedAt());
+        dto.setAiDescription(event.getAiDescription());
         return dto;
     }
 }

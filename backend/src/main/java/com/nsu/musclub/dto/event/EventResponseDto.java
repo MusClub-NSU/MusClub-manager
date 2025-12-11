@@ -10,6 +10,7 @@ public class EventResponseDto {
     private OffsetDateTime endTime;
     private String venue;
     private OffsetDateTime createdAt;
+    private String aiDescription;
 
     public Long getId() {
         return id;
@@ -65,5 +66,13 @@ public class EventResponseDto {
 
     public void setCreatedAt(OffsetDateTime createdAt) {
         this.createdAt = createdAt;
+    }
+
+    public String getAiDescription() {
+        return aiDescription;
+    }
+
+    public void setAiDescription(String aiDescription) {
+        this.aiDescription = aiDescription;
     }
 }

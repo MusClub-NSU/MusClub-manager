@@ -1,26 +1,42 @@
 package com.nsu.musclub.web;
 
-import com.nsu.musclub.dto.event.*;
+import com.nsu.musclub.dto.event.EventCreateDto;
+import com.nsu.musclub.dto.event.EventMemberResponseDto;
+import com.nsu.musclub.dto.event.EventMemberUpsertDto;
+import com.nsu.musclub.dto.event.EventResponseDto;
+import com.nsu.musclub.dto.event.EventTreeNodeDto;
+import com.nsu.musclub.dto.event.EventUpdateDto;
+import com.nsu.musclub.dto.event.PosterDescriptionResponseDto;
+import com.nsu.musclub.service.EventPosterAiService;
 import com.nsu.musclub.service.EventRelationService;
 import com.nsu.musclub.service.EventService;
 import jakarta.validation.Valid;
+import org.springdoc.core.annotations.ParameterObject;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.*;
-import org.springdoc.core.annotations.ParameterObject;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.Parameter;
+import io.swagger.v3.oas.annotations.tags.Tag;
 
 import java.util.List;
 
+@Tag(name = "Events", description = "Operations with musical events and AI-generated poster descriptions")
 @RestController
 @RequestMapping("/api/events")
 public class EventController {
+
     private final EventService service;
     private final EventRelationService relations;
+    private final EventPosterAiService posterAiService;
 
-    public EventController(EventService service, EventRelationService relations) {
+    public EventController(EventService service,
+                           EventRelationService relations,
+                           EventPosterAiService posterAiService) {
         this.service = service;
         this.relations = relations;
+        this.posterAiService = posterAiService;
     }
 
     @PostMapping
@@ -91,5 +107,27 @@ public class EventController {
     public EventTreeNodeDto tree(@PathVariable Long eventId,
                                  @RequestParam(defaultValue = "3") int depth) {
         return relations.getTree(eventId, depth);
+    }
+
+    @Operation(
+            summary = "Generate AI-based poster description",
+            description = """
+                    Генерирует текст описания афиши для события на основе его данных (название, время, место, текущее описание).
+                    При save=true сгенерированный текст сохраняется в поле aiDescription события.
+                    """
+    )
+    @PostMapping("/{eventId}/poster-description/ai")
+    public PosterDescriptionResponseDto generatePosterDescription(
+            @Parameter(description = "Идентификатор события", example = "1")
+            @PathVariable Long eventId,
+
+            @Parameter(
+                    description = "Если true — сохранить результат в поле aiDescription события",
+                    example = "false"
+            )
+            @RequestParam(defaultValue = "false") boolean save
+    ) {
+        String description = posterAiService.generatePosterDescription(eventId, save);
+        return new PosterDescriptionResponseDto(description);
     }
 }
