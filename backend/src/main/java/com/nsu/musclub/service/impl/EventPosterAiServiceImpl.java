@@ -10,6 +10,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.client.HttpClientErrorException;
+import org.springframework.web.client.HttpServerErrorException;
 import org.springframework.web.server.ResponseStatusException;
 
 import java.time.format.DateTimeFormatter;
@@ -49,17 +50,30 @@ public class EventPosterAiServiceImpl implements EventPosterAiService {
         try {
             description = aiTextClient.generateText(systemPrompt, userPrompt);
         } catch (HttpClientErrorException e) {
+            log.error("AI provider client error while generating description for event {}: status={}, body={}",
+                    eventId, e.getStatusCode(), e.getResponseBodyAsString(), e);
+
             if (e.getStatusCode().value() == 402) {
                 throw new ResponseStatusException(
                         HttpStatus.BAD_GATEWAY,
                         "Провайдер ИИ вернул ошибку оплаты (Insufficient Balance). Обратитесь к администратору."
                 );
             }
+
             throw new ResponseStatusException(
                     HttpStatus.SERVICE_UNAVAILABLE,
                     "Ошибка при обращении к провайдеру ИИ: " + e.getStatusCode()
             );
+        } catch (HttpServerErrorException e) {
+            log.error("AI provider server error while generating description for event {}: status={}, body={}",
+                    eventId, e.getStatusCode(), e.getResponseBodyAsString(), e);
+
+            throw new ResponseStatusException(
+                    HttpStatus.SERVICE_UNAVAILABLE,
+                    "Провайдер ИИ временно недоступен, попробуйте позже"
+            );
         } catch (Exception e) {
+            log.error("Unexpected error while generating AI poster description for event {}", eventId, e);
             throw new ResponseStatusException(
                     HttpStatus.SERVICE_UNAVAILABLE,
                     "Не удалось сгенерировать описание афиши, попробуйте позже"
