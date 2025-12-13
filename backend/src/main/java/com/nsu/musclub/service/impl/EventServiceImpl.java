@@ -57,6 +57,12 @@ public class EventServiceImpl implements EventService {
     }
 
     private void validateEventTimes(OffsetDateTime startTime, OffsetDateTime endTime) {
+        if (startTime != null && startTime.isBefore(OffsetDateTime.now())) {
+            throw new ResponseStatusException(
+                    HttpStatus.BAD_REQUEST,
+                    "Start time must be in the future"
+            );
+        }
         if (endTime != null && startTime != null && endTime.isBefore(startTime)) {
             throw new ResponseStatusException(
                     HttpStatus.BAD_REQUEST,

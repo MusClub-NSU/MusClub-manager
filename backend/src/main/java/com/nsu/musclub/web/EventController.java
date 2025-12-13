@@ -7,9 +7,12 @@ import com.nsu.musclub.dto.event.EventResponseDto;
 import com.nsu.musclub.dto.event.EventTreeNodeDto;
 import com.nsu.musclub.dto.event.EventUpdateDto;
 import com.nsu.musclub.dto.event.PosterDescriptionResponseDto;
+import com.nsu.musclub.dto.event.SocialMediaPostRequestDto;
+import com.nsu.musclub.dto.event.SocialMediaPostResponseDto;
 import com.nsu.musclub.service.EventPosterAiService;
 import com.nsu.musclub.service.EventRelationService;
 import com.nsu.musclub.service.EventService;
+import com.nsu.musclub.service.SocialMediaPostAiService;
 import jakarta.validation.Valid;
 import org.springdoc.core.annotations.ParameterObject;
 import org.springframework.data.domain.Page;
@@ -22,7 +25,7 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 
 import java.util.List;
 
-@Tag(name = "Events", description = "Operations with musical events and AI-generated poster descriptions")
+@Tag(name = "Events", description = "Operations with musical events, AI-generated poster descriptions, and social media posts")
 @RestController
 @RequestMapping("/api/events")
 public class EventController {
@@ -30,13 +33,16 @@ public class EventController {
     private final EventService service;
     private final EventRelationService relations;
     private final EventPosterAiService posterAiService;
+    private final SocialMediaPostAiService socialMediaPostAiService;
 
     public EventController(EventService service,
                            EventRelationService relations,
-                           EventPosterAiService posterAiService) {
+                           EventPosterAiService posterAiService,
+                           SocialMediaPostAiService socialMediaPostAiService) {
         this.service = service;
         this.relations = relations;
         this.posterAiService = posterAiService;
+        this.socialMediaPostAiService = socialMediaPostAiService;
     }
 
     @PostMapping
@@ -112,22 +118,66 @@ public class EventController {
     @Operation(
             summary = "Generate AI-based poster description",
             description = """
-                    Генерирует текст описания афиши для события на основе его данных (название, время, место, текущее описание).
-                    При save=true сгенерированный текст сохраняется в поле aiDescription события.
+                    Generates a poster description text for an event based on its data (title, time, venue, current description).
+                    If save=true, the generated text is saved to the event's aiDescription field.
                     """
     )
     @PostMapping("/{eventId}/poster-description/ai")
     public PosterDescriptionResponseDto generatePosterDescription(
-            @Parameter(description = "Идентификатор события", example = "1")
+            @Parameter(description = "Event identifier", example = "1")
             @PathVariable Long eventId,
 
             @Parameter(
-                    description = "Если true — сохранить результат в поле aiDescription события",
+                    description = "If true — save the result to the event's aiDescription field",
                     example = "false"
             )
             @RequestParam(defaultValue = "false") boolean save
     ) {
         String description = posterAiService.generatePosterDescription(eventId, save);
         return new PosterDescriptionResponseDto(description);
+    }
+
+    @Operation(
+            summary = "Generate AI-based social media post",
+            description = """
+                    Generates a social media post for an event using AI.
+                    Supports multiple platforms (twitter, instagram, facebook, linkedin) and tones (casual, professional, enthusiastic, informative).
+                    """
+    )
+    @PostMapping("/{eventId}/social-media-post/ai")
+    public SocialMediaPostResponseDto generateSocialMediaPost(
+            @Parameter(description = "Event identifier", example = "1")
+            @PathVariable Long eventId,
+            
+            @Parameter(description = "Target social media platform", example = "twitter")
+            @RequestParam(required = false, defaultValue = "general") String platform,
+            
+            @Parameter(description = "Desired tone of the post", example = "casual")
+            @RequestParam(required = false, defaultValue = "casual") String tone
+    ) {
+        return socialMediaPostAiService.generateSocialMediaPost(eventId, platform, tone);
+    }
+
+    @Operation(
+            summary = "Generate AI-based social media post with request body",
+            description = """
+                    Generates a social media post for an event using AI with customizable options via request body.
+                    """
+    )
+    @PostMapping("/{eventId}/social-media-post/ai/advanced")
+    public SocialMediaPostResponseDto generateSocialMediaPostAdvanced(
+            @Parameter(description = "Event identifier", example = "1")
+            @PathVariable Long eventId,
+            
+            @RequestBody(required = false) SocialMediaPostRequestDto request
+    ) {
+        if (request == null) {
+            return socialMediaPostAiService.generateSocialMediaPost(eventId);
+        }
+        return socialMediaPostAiService.generateSocialMediaPost(
+                eventId, 
+                request.getPlatform() != null ? request.getPlatform() : "general",
+                request.getTone() != null ? request.getTone() : "casual"
+        );
     }
 }

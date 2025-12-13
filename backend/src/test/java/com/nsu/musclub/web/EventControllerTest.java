@@ -4,9 +4,15 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.nsu.musclub.AbstractIntegrationTest;
 import com.nsu.musclub.dto.event.EventCreateDto;
 import com.nsu.musclub.dto.event.EventUpdateDto;
+import com.nsu.musclub.dto.event.SocialMediaPostRequestDto;
+import com.nsu.musclub.dto.event.SocialMediaPostResponseDto;
+import com.nsu.musclub.service.EventPosterAiService;
+import com.nsu.musclub.service.SocialMediaPostAiService;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
+import org.springframework.boot.test.mock.mockito.MockBean;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.transaction.annotation.Transactional;
@@ -14,6 +20,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.time.OffsetDateTime;
 
 import static org.hamcrest.Matchers.*;
+import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
@@ -26,6 +33,18 @@ class EventControllerTest extends AbstractIntegrationTest {
 
     @Autowired
     private ObjectMapper objectMapper;
+
+    @MockBean
+    private EventPosterAiService posterAiService;
+
+    @MockBean
+    private SocialMediaPostAiService socialMediaPostAiService;
+
+    @BeforeEach
+    void setUp() {
+        // Reset mocks before each test
+        org.mockito.Mockito.reset(posterAiService, socialMediaPostAiService);
+    }
 
     private OffsetDateTime futureTime() {
         return OffsetDateTime.now().plusDays(1);
@@ -616,5 +635,190 @@ class EventControllerTest extends AbstractIntegrationTest {
         dto.setTitle(title);
         dto.setStartTime(futureTime());
         return dto;
+    }
+
+    @Test
+    void generatePosterDescription_ShouldReturn200() throws Exception {
+        String eventResponse = mockMvc.perform(post("/api/events")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(createEventDto("Test Event"))))
+                .andExpect(status().isCreated())
+                .andReturn()
+                .getResponse()
+                .getContentAsString();
+        Long eventId = objectMapper.readTree(eventResponse).get("id").asLong();
+
+        String expectedDescription = "Join us for an amazing Test Event!";
+        when(posterAiService.generatePosterDescription(eventId, false))
+                .thenReturn(expectedDescription);
+
+        mockMvc.perform(post("/api/events/{eventId}/poster-description/ai", eventId)
+                        .param("save", "false"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.description").value(expectedDescription));
+    }
+
+    @Test
+    void generatePosterDescription_WithSaveTrue_ShouldReturn200() throws Exception {
+        String eventResponse = mockMvc.perform(post("/api/events")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(createEventDto("Test Event"))))
+                .andExpect(status().isCreated())
+                .andReturn()
+                .getResponse()
+                .getContentAsString();
+        Long eventId = objectMapper.readTree(eventResponse).get("id").asLong();
+
+        String expectedDescription = "Amazing event description";
+        when(posterAiService.generatePosterDescription(eventId, true))
+                .thenReturn(expectedDescription);
+
+        mockMvc.perform(post("/api/events/{eventId}/poster-description/ai", eventId)
+                        .param("save", "true"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.description").value(expectedDescription));
+    }
+
+    @Test
+    void generatePosterDescription_WithNonExistentEvent_ShouldReturn404() throws Exception {
+        when(posterAiService.generatePosterDescription(99999L, false))
+                .thenThrow(new org.springframework.web.server.ResponseStatusException(
+                        org.springframework.http.HttpStatus.NOT_FOUND, "Event not found"));
+
+        mockMvc.perform(post("/api/events/{eventId}/poster-description/ai", 99999L)
+                        .param("save", "false"))
+                .andExpect(status().isNotFound());
+    }
+
+    @Test
+    void generateSocialMediaPost_WithDefaultParams_ShouldReturn200() throws Exception {
+        String eventResponse = mockMvc.perform(post("/api/events")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(createEventDto("Test Event"))))
+                .andExpect(status().isCreated())
+                .andReturn()
+                .getResponse()
+                .getContentAsString();
+        Long eventId = objectMapper.readTree(eventResponse).get("id").asLong();
+
+        SocialMediaPostResponseDto expectedResponse = new SocialMediaPostResponseDto(
+                "Join us for Test Event! #Music", "general", "casual");
+        when(socialMediaPostAiService.generateSocialMediaPost(eventId, "general", "casual"))
+                .thenReturn(expectedResponse);
+
+        mockMvc.perform(post("/api/events/{eventId}/social-media-post/ai", eventId))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.content").value("Join us for Test Event! #Music"))
+                .andExpect(jsonPath("$.platform").value("general"))
+                .andExpect(jsonPath("$.tone").value("casual"));
+    }
+
+    @Test
+    void generateSocialMediaPost_WithPlatformAndTone_ShouldReturn200() throws Exception {
+        String eventResponse = mockMvc.perform(post("/api/events")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(createEventDto("Test Event"))))
+                .andExpect(status().isCreated())
+                .andReturn()
+                .getResponse()
+                .getContentAsString();
+        Long eventId = objectMapper.readTree(eventResponse).get("id").asLong();
+
+        SocialMediaPostResponseDto expectedResponse = new SocialMediaPostResponseDto(
+                "Rock Concert 2024! 🎸 #RockConcert", "twitter", "enthusiastic");
+        when(socialMediaPostAiService.generateSocialMediaPost(eventId, "twitter", "enthusiastic"))
+                .thenReturn(expectedResponse);
+
+        mockMvc.perform(post("/api/events/{eventId}/social-media-post/ai", eventId)
+                        .param("platform", "twitter")
+                        .param("tone", "enthusiastic"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.content").value("Rock Concert 2024! 🎸 #RockConcert"))
+                .andExpect(jsonPath("$.platform").value("twitter"))
+                .andExpect(jsonPath("$.tone").value("enthusiastic"));
+    }
+
+    @Test
+    void generateSocialMediaPost_WithInstagram_ShouldReturn200() throws Exception {
+        String eventResponse = mockMvc.perform(post("/api/events")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(createEventDto("Test Event"))))
+                .andExpect(status().isCreated())
+                .andReturn()
+                .getResponse()
+                .getContentAsString();
+        Long eventId = objectMapper.readTree(eventResponse).get("id").asLong();
+
+        SocialMediaPostResponseDto expectedResponse = new SocialMediaPostResponseDto(
+                "Amazing event! 🎵✨\n#Music #Event", "instagram", "casual");
+        when(socialMediaPostAiService.generateSocialMediaPost(eventId, "instagram", "casual"))
+                .thenReturn(expectedResponse);
+
+        mockMvc.perform(post("/api/events/{eventId}/social-media-post/ai", eventId)
+                        .param("platform", "instagram")
+                        .param("tone", "casual"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.platform").value("instagram"));
+    }
+
+    @Test
+    void generateSocialMediaPost_WithAdvancedEndpoint_ShouldReturn200() throws Exception {
+        String eventResponse = mockMvc.perform(post("/api/events")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(createEventDto("Test Event"))))
+                .andExpect(status().isCreated())
+                .andReturn()
+                .getResponse()
+                .getContentAsString();
+        Long eventId = objectMapper.readTree(eventResponse).get("id").asLong();
+
+        SocialMediaPostRequestDto requestDto = new SocialMediaPostRequestDto();
+        requestDto.setPlatform("facebook");
+        requestDto.setTone("professional");
+
+        SocialMediaPostResponseDto expectedResponse = new SocialMediaPostResponseDto(
+                "Professional event announcement", "facebook", "professional");
+        when(socialMediaPostAiService.generateSocialMediaPost(eventId, "facebook", "professional"))
+                .thenReturn(expectedResponse);
+
+        mockMvc.perform(post("/api/events/{eventId}/social-media-post/ai/advanced", eventId)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(requestDto)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.platform").value("facebook"))
+                .andExpect(jsonPath("$.tone").value("professional"));
+    }
+
+    @Test
+    void generateSocialMediaPost_WithAdvancedEndpoint_WithoutBody_ShouldUseDefaults() throws Exception {
+        String eventResponse = mockMvc.perform(post("/api/events")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(createEventDto("Test Event"))))
+                .andExpect(status().isCreated())
+                .andReturn()
+                .getResponse()
+                .getContentAsString();
+        Long eventId = objectMapper.readTree(eventResponse).get("id").asLong();
+
+        SocialMediaPostResponseDto expectedResponse = new SocialMediaPostResponseDto(
+                "Default post", "general", "casual");
+        when(socialMediaPostAiService.generateSocialMediaPost(eventId))
+                .thenReturn(expectedResponse);
+
+        mockMvc.perform(post("/api/events/{eventId}/social-media-post/ai/advanced", eventId)
+                        .contentType(MediaType.APPLICATION_JSON))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.platform").value("general"))
+                .andExpect(jsonPath("$.tone").value("casual"));
+    }
+
+    @Test
+    void generateSocialMediaPost_WithNonExistentEvent_ShouldReturn404() throws Exception {
+        when(socialMediaPostAiService.generateSocialMediaPost(99999L, "general", "casual"))
+                .thenThrow(new org.springframework.web.server.ResponseStatusException(
+                        org.springframework.http.HttpStatus.NOT_FOUND, "Event not found"));
+
+        mockMvc.perform(post("/api/events/{eventId}/social-media-post/ai", 99999L))
+                .andExpect(status().isNotFound());
     }
 }

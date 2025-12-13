@@ -32,5 +32,5 @@ springdoc:
 
 deepseek:
   api-url: https://api.deepseek.com/v1/chat/completions
-  api-key: ${DEEPSEEK_API_KEY}   # установи через переменную окружения
+  api-key: ${DEEPSEEK_API_KEY:test-api-key-for-testing-only}   # установи через переменную окружения
   model: deepseek-chat           # или другой доступный модельный ID
