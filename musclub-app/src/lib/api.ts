@@ -1,4 +1,4 @@
-import { User, UserCreateDto, UserUpdateDto, Event, EventCreateDto, EventUpdateDto, Page, Pageable, EventMember, EventMemberUpsertDto } from '../types/api';
+import { User, UserCreateDto, UserUpdateDto, Event, EventCreateDto, EventUpdateDto, Page, Pageable, EventMember, EventMemberUpsertDto, PosterDescriptionResponse } from '../types/api';
 
 const API_BASE_URL = 'http://localhost:8080/api';
 
@@ -138,6 +138,13 @@ class ApiClient {
   async removeEventMember(eventId: number, userId: number): Promise<void> {
     return this.request<void>(`/events/${eventId}/members/${userId}`, {
       method: 'DELETE',
+    });
+  }
+
+  // AI-построение описания афиши
+  async generatePosterDescription(eventId: number, save: boolean = false): Promise<PosterDescriptionResponse> {
+    return this.request<PosterDescriptionResponse>(`/events/${eventId}/poster-description/ai?save=${save}`, {
+      method: 'POST',
     });
   }
 }
