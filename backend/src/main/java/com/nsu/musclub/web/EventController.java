@@ -22,6 +22,7 @@ import org.springframework.web.bind.annotation.*;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import com.nsu.musclub.service.EventNotificationService;
 
 import java.util.List;
 
@@ -34,15 +35,14 @@ public class EventController {
     private final EventRelationService relations;
     private final EventPosterAiService posterAiService;
     private final SocialMediaPostAiService socialMediaPostAiService;
+    private final EventNotificationService notificationService;
 
-    public EventController(EventService service,
-                           EventRelationService relations,
-                           EventPosterAiService posterAiService,
-                           SocialMediaPostAiService socialMediaPostAiService) {
+    public EventController(EventService service, EventRelationService relations, EventPosterAiService posterAiService, SocialMediaPostAiService socialMediaPostAiService, EventNotificationService notificationService) {
         this.service = service;
         this.relations = relations;
         this.posterAiService = posterAiService;
         this.socialMediaPostAiService = socialMediaPostAiService;
+        this.notificationService = notificationService;
     }
 
     @PostMapping
@@ -79,8 +79,7 @@ public class EventController {
 
     @PostMapping("/{eventId}/members")
     @ResponseStatus(HttpStatus.OK)
-    public EventMemberResponseDto upsertMember(@PathVariable Long eventId,
-                                               @RequestBody @Valid EventMemberUpsertDto dto) {
+    public EventMemberResponseDto upsertMember(@PathVariable Long eventId, @RequestBody @Valid EventMemberUpsertDto dto) {
         return relations.upsertMember(eventId, dto);
     }
 
@@ -92,8 +91,7 @@ public class EventController {
 
     @PostMapping("/{parentId}/subevents")
     @ResponseStatus(HttpStatus.CREATED)
-    public EventResponseDto createSubEvent(@PathVariable Long parentId,
-                                           @RequestBody @Valid EventCreateDto dto) {
+    public EventResponseDto createSubEvent(@PathVariable Long parentId, @RequestBody @Valid EventCreateDto dto) {
         return relations.createSubEvent(parentId, dto);
     }
 
@@ -110,74 +108,51 @@ public class EventController {
     }
 
     @GetMapping("/{eventId}/tree")
-    public EventTreeNodeDto tree(@PathVariable Long eventId,
-                                 @RequestParam(defaultValue = "3") int depth) {
+    public EventTreeNodeDto tree(@PathVariable Long eventId, @RequestParam(defaultValue = "3") int depth) {
         return relations.getTree(eventId, depth);
     }
 
-    @Operation(
-            summary = "Generate AI-based poster description",
-            description = """
-                    Generates a poster description text for an event based on its data (title, time, venue, current description).
-                    If save=true, the generated text is saved to the event's aiDescription field.
-                    """
-    )
+    @Operation(summary = "Generate AI-based poster description", description = """
+            Generates a poster description text for an event based on its data (title, time, venue, current description).
+            If save=true, the generated text is saved to the event's aiDescription field.
+            """)
     @PostMapping("/{eventId}/poster-description/ai")
-    public PosterDescriptionResponseDto generatePosterDescription(
-            @Parameter(description = "Event identifier", example = "1")
-            @PathVariable Long eventId,
+    public PosterDescriptionResponseDto generatePosterDescription(@Parameter(description = "Event identifier", example = "1") @PathVariable Long eventId,
 
-            @Parameter(
-                    description = "If true — save the result to the event's aiDescription field",
-                    example = "false"
-            )
-            @RequestParam(defaultValue = "false") boolean save
-    ) {
+                                                                  @Parameter(description = "If true — save the result to the event's aiDescription field", example = "false") @RequestParam(defaultValue = "false") boolean save) {
         String description = posterAiService.generatePosterDescription(eventId, save);
         return new PosterDescriptionResponseDto(description);
     }
 
-    @Operation(
-            summary = "Generate AI-based social media post",
-            description = """
-                    Generates a social media post for an event using AI.
-                    Supports multiple platforms (twitter, instagram, facebook, linkedin) and tones (casual, professional, enthusiastic, informative).
-                    """
-    )
+    @Operation(summary = "Generate AI-based social media post", description = """
+            Generates a social media post for an event using AI.
+            Supports multiple platforms (twitter, instagram, facebook, linkedin) and tones (casual, professional, enthusiastic, informative).
+            """)
     @PostMapping("/{eventId}/social-media-post/ai")
-    public SocialMediaPostResponseDto generateSocialMediaPost(
-            @Parameter(description = "Event identifier", example = "1")
-            @PathVariable Long eventId,
-            
-            @Parameter(description = "Target social media platform", example = "twitter")
-            @RequestParam(required = false, defaultValue = "general") String platform,
-            
-            @Parameter(description = "Desired tone of the post", example = "casual")
-            @RequestParam(required = false, defaultValue = "casual") String tone
-    ) {
+    public SocialMediaPostResponseDto generateSocialMediaPost(@Parameter(description = "Event identifier", example = "1") @PathVariable Long eventId,
+
+                                                              @Parameter(description = "Target social media platform", example = "twitter") @RequestParam(required = false, defaultValue = "general") String platform,
+
+                                                              @Parameter(description = "Desired tone of the post", example = "casual") @RequestParam(required = false, defaultValue = "casual") String tone) {
         return socialMediaPostAiService.generateSocialMediaPost(eventId, platform, tone);
     }
 
-    @Operation(
-            summary = "Generate AI-based social media post with request body",
-            description = """
-                    Generates a social media post for an event using AI with customizable options via request body.
-                    """
-    )
+    @Operation(summary = "Generate AI-based social media post with request body", description = """
+            Generates a social media post for an event using AI with customizable options via request body.
+            """)
     @PostMapping("/{eventId}/social-media-post/ai/advanced")
-    public SocialMediaPostResponseDto generateSocialMediaPostAdvanced(
-            @Parameter(description = "Event identifier", example = "1")
-            @PathVariable Long eventId,
-            
-            @RequestBody(required = false) SocialMediaPostRequestDto request
-    ) {
+    public SocialMediaPostResponseDto generateSocialMediaPostAdvanced(@Parameter(description = "Event identifier", example = "1") @PathVariable Long eventId,
+
+                                                                      @RequestBody(required = false) SocialMediaPostRequestDto request) {
         if (request == null) {
             return socialMediaPostAiService.generateSocialMediaPost(eventId);
         }
-        return socialMediaPostAiService.generateSocialMediaPost(
-                eventId, 
-                request.getPlatform() != null ? request.getPlatform() : "general",
-                request.getTone() != null ? request.getTone() : "casual"
-        );
+        return socialMediaPostAiService.generateSocialMediaPost(eventId, request.getPlatform() != null ? request.getPlatform() : "general", request.getTone() != null ? request.getTone() : "casual");
+    }
+
+    @PostMapping("/{eventId}/notifications/24h")
+    @ResponseStatus(HttpStatus.ACCEPTED)
+    public void schedule24hNotifications(@PathVariable Long eventId) {
+        notificationService.schedule24hBeforeForEventParticipants(eventId);
     }
 }
