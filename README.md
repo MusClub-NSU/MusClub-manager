@@ -1,56 +1,93 @@
 # 🎶 MusClub Manager
 
-**MusClub Manager** is a web application designed for the NSU Music Club to improve the efficiency of planning and organizing musical events.  
-The service consolidates scheduling, task management, resource allocation, and communication into a single system, making the organizational process more convenient than using multiple third-party tools.  
+**MusClub Manager** — веб-приложение для NSU Music Club, которое объединяет планирование мероприятий, управление задачами/активностями и коммуникацию с участниками в одном месте, вместо разрозненных Google Sheets / Trello / ручных сообщений в мессенджерах.
 
-The application is developed as a **Progressive Web App (PWA)**, ensuring accessibility on both desktop and mobile devices.
-
----
-
-## 🚧 Possible Difficulties
-
-- **Complex requirements:** the system must support a wide range of organizational tasks (from concert programs and timelines to sponsorship and promotion), which increases development complexity.  
-- **Balancing usability and functionality:** the platform must remain simple enough for students to use effectively while still providing advanced planning capabilities.  
-- **Notifications and deadlines:** implementing customizable reminders, deadline tracking, and escalation rules may be technically challenging.  
-- **Role-based access control:** differentiating between organizers and club members while keeping information flexible and secure could complicate the design.  
-- **User adoption:** transitioning from familiar tools (Trello, Google Sheets) may face resistance unless the new system proves significantly more convenient.
+Проект развивается как **Progressive Web App (PWA)** — удобно открывается и на телефоне, и на ПК, при этом основной сценарий — управление с мобильного “здесь и сейчас”.
 
 ---
 
-## ❓ Why This Project and How It Will Be Executed
+## ✨ Что уже реализовано
 
-Existing tools used by the NSU Music Club (Trello, Google Sheets, etc.) do not fully meet its organizational needs and often cause inefficiencies.  
+### 📅 Мероприятия
 
-**MusClub Manager** will allow the club to:  
-- centralize event planning;  
-- assign responsibilities;  
-- track progress;  
-- notify participants;  
-- document every organizational step (venue preparation, content planning, sponsorship, promotion, etc.).  
+* Создание и ведение мероприятий (основные данные: дата/время, место, описание).
+* Привязка участников к **конкретному мероприятию** (важно для рассылок и ответственности).
 
-Thanks to its **PWA architecture**, the application will work seamlessly across devices and simplify distribution.
+### ✅ Планирование и управление процессом
 
----
+* Модель “планирования через сущности/активности” (единая логика для разных элементов подготовки: задачи, пункты программы, таймплан, список оборудования и т.д.).
+* Поддержка статусов (примерно в логике): `not started`, `in progress`, `nearly finished`, `completed`, `canceled`, `failed`.
 
-## 📌 Implementation Phases
+### ✉️ Отложенные уведомления (email)
 
-1. **Requirements Analysis** — gather feedback from organizers and club members.  
-2. **Event Planning Module** — create events with descriptions, dates, venues, and programs. Support structured planning across mandatory steps (theme, venue, posters, promotions, sponsorship, etc.).  
-3. **Core Architecture and Data Model** — define a unified `Action` entity with properties. Implement role-based access (organizers vs. club members).  
-4. **Task and Timeline Management** — implement statuses (`not started`, `in progress`, `nearly finished`, `completed`, `canceled`, `failed`). Add customizable deadlines and reminder logic (for responsible users or the whole team).  
-5. **Testing and Iterative Feedback** — conduct user testing within the Music Club and adjust workflows and the interface based on feedback.
+* Реализованы **отложенные e-mail уведомления** по правилу:
+
+  * уведомление отправляется **за 24 часа до начала мероприятия**;
+  * уведомления получают **только участники, назначенные на это мероприятие** (не “весь клуб” и не “все пользователи системы”).
+* Архитектура предусматривает расширение на другие каналы (push/telegram и т.п.).
 
 ---
 
-## 📱 Technologies
+## 🧭 Зачем это нужно клубу
 
-- **PWA** for cross-platform accessibility  
-- Role-based access model  
-- Notifications and reminders  
-- Structured event and task management  
+Сейчас организация обычно выглядит так: таблицы для времени/места/участников, отдельная таблица для таймплана, отдельная — для программы, списки оборудования, ручная рассылка и ручные напоминания. Это неудобно и приводит к ошибкам.
+
+MusClub Manager переводит процесс в единый поток:
+
+* мероприятие как “центр” всей подготовки;
+* участники и ответственности связаны с мероприятием;
+* прогресс виден по статусам;
+* напоминания запускаются автоматически.
 
 ---
 
-## 💡 Project Status
+## 🧩 Основные модули проекта
 
-📌 Currently in the requirements and architecture design stage.
+* **Event** — мероприятие как корневая сущность.
+* **Участники мероприятия** — назначение людей на конкретное событие.
+* **Активности/задачи** — единая модель для пунктов подготовки (со статусами).
+* **Уведомления** — планирование и отправка отложенных сообщений (сейчас: email за 24 часа).
+
+---
+
+## ⚙️ Технологии 
+
+* **Backend:** Java + Spring, сборка через **Gradle**
+* **Frontend:** PWA (клиент для мобильного и десктопа)
+* **Notifications:** отложенная отправка e-mail через SMTP (настраивается в конфигурации)
+
+---
+
+## 🔧 Конфигурация e-mail уведомлений (SMTP)
+
+Для отправки писем используется SMTP-конфигурация в настройках приложения (пример):
+
+```yaml
+mail:
+  host: smtp.example.com
+  port: 587
+  username: your_smtp_login
+  password: your_smtp_password
+  properties:
+    mail.smtp.auth: true
+    mail.smtp.starttls.enable: true
+```
+
+Правило рассылки сейчас фиксированное: **за 24 часа до начала мероприятия**.
+
+---
+
+## 🗺️ Roadmap
+
+* **Отложенные push-уведомления** (для PWA / мобильного сценария).
+* **Роли и уровни доступа (RBAC)**: организатор / участник / наблюдатель и т.п.
+* Гибкие правила напоминаний (например, несколько уведомлений: за 24ч, за 2ч, за 15мин).
+* Улучшение UX сценария “организатор всё делает с телефона”.
+
+---
+
+## 📌 Статус проекта
+
+Проект находится в активной разработке: базовая архитектура и ключевые сценарии уже собраны, реализован механизм отложенных уведомлений по e-mail, продолжается расширение функциональности и удобства пользовательского потока.
+
+---
