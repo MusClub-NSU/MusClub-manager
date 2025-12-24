@@ -28,6 +28,7 @@ export interface Event {
   endTime?: string;
   venue?: string;
   createdAt: string;
+  aiDescription?: string;
 }
 
 export interface EventCreateDto {
@@ -76,5 +77,10 @@ export interface EventMember {
 export interface EventMemberUpsertDto {
   userId: number;
   role: string;
+}
+
+// Типы для ИИ-описания афиши
+export interface PosterDescriptionResponse {
+  description: string;
 }
 

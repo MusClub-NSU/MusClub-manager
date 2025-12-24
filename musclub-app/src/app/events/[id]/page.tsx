@@ -27,7 +27,7 @@ interface ProgramItem {
 export default function EventDetailsPage() {
     const { id } = useParams();
     const router = useRouter();
-    const { events, loading, error, updateEvent } = useEvents({ page: 0, size: 100 });
+    const { events, loading, error, updateEvent, refetch } = useEvents({ page: 0, size: 100 });
     const { users, loading: usersLoading } = useUsers({ page: 0, size: 100 });
     const { visible } = useSidebar();
     const [activeTab, setActiveTab] = useState('assignments');
@@ -58,6 +58,13 @@ export default function EventDetailsPage() {
     const [newProgramDuration, setNewProgramDuration] = useState('');
     const [newProgramNotes, setNewProgramNotes] = useState('');
     
+    // Состояние для генерации описания афиши
+    const [aiDescriptionText, setAiDescriptionText] = useState('');
+    const [showAiModal, setShowAiModal] = useState(false);
+    const [aiGenerating, setAiGenerating] = useState(false);
+    const [saveAiDescription, setSaveAiDescription] = useState(true);
+    const [aiError, setAiError] = useState<string | null>(null);
+
 
     const [isEditing, setIsEditing] = useState(false);
     const event = events.find((e) => e.id === Number(id));
@@ -71,6 +78,9 @@ export default function EventDetailsPage() {
         setShowAddRole(false);
         setNewRoleName('');
         setCreatedRoles([]);
+        setAiDescriptionText('');
+        setShowAiModal(false);
+        setAiError(null);
         
         if (event?.id) {
             loadEventMembers();
@@ -155,6 +165,24 @@ export default function EventDetailsPage() {
     };
 
     const { date, time } = formatDateTime(editData.startTime || event.startTime);
+
+    const handleGenerateAiDescription = async () => {
+        if (!event?.id) return;
+        try {
+            setAiGenerating(true);
+            setAiError(null);
+            const response = await apiClient.generatePosterDescription(event.id, saveAiDescription);
+            setAiDescriptionText(response.description);
+            setShowAiModal(true);
+            if (saveAiDescription) {
+                await refetch();
+            }
+        } catch (err) {
+            setAiError(err instanceof Error ? err.message : 'Не удалось сгенерировать описание для афиши');
+        } finally {
+            setAiGenerating(false);
+        }
+    };
 
     const handleSave = async () => {
         try {
@@ -451,6 +479,41 @@ export default function EventDetailsPage() {
                         {event.description}
                     </p>
                 )}
+                <div className="flex flex-col gap-3">
+                    {event.aiDescription && (
+                        <Card className="p-4 bg-[--g-color-base-generic-hover] border border-[--g-color-line-generic]">
+                            <Text variant="subheader-2" className="font-semibold mb-2">Описание для афиши</Text>
+                            <Text color="secondary" className="whitespace-pre-wrap">
+                                {event.aiDescription}
+                            </Text>
+                        </Card>
+                    )}
+                    <div className="flex flex-col sm:flex-row sm:items-center gap-3">
+                        <Button
+                            view="action"
+                            size="m"
+                            onClick={handleGenerateAiDescription}
+                            loading={aiGenerating}
+                            disabled={aiGenerating}
+                        >
+                            Сгенерировать текст афиши
+                        </Button>
+                        <label className="flex items-center gap-2 text-sm text-[--g-color-text-secondary]">
+                            <input
+                                type="checkbox"
+                                checked={saveAiDescription}
+                                onChange={(e) => setSaveAiDescription(e.target.checked)}
+                                className="w-4 h-4"
+                            />
+                            <span>Сохранить результат в событии</span>
+                        </label>
+                    </div>
+                    {aiError && (
+                        <Text color="danger" className="text-sm">
+                            {aiError}
+                        </Text>
+                    )}
+                </div>
             </section>
 
             {/* Табы */}
@@ -1079,6 +1142,37 @@ export default function EventDetailsPage() {
                     </>
                 )}
             </div>
+
+            {showAiModal && (
+                <div
+                    className="fixed inset-0 z-50 flex items-center justify-center bg-background/70 backdrop-blur-sm px-4"
+                    onClick={() => setShowAiModal(false)}
+                >
+                    <Card
+                        className="max-w-3xl w-full p-6 sm:p-8 relative"
+                        onClick={(e) => e.stopPropagation()}
+                    >
+                        <div className="flex justify-between items-start gap-3 mb-4">
+                            <Text variant="header-2">Сгенерированное описание</Text>
+                            <Button
+                                size="s"
+                                view="flat"
+                                onClick={() => setShowAiModal(false)}
+                            >
+                                <Icon data={Xmark} size={16}/>
+                            </Button>
+                        </div>
+                        <Text className="whitespace-pre-wrap text-base sm:text-lg text-[--g-color-text-primary]">
+                            {aiDescriptionText || 'Текст не получен'}
+                        </Text>
+                        <div className="flex justify-end gap-3 mt-6">
+                            <Button view="action" onClick={() => setShowAiModal(false)}>
+                                Закрыть
+                            </Button>
+                        </div>
+                    </Card>
+                </div>
+            )}
 
             {visible && (
                 <div className="fixed inset-0 bg-background/70 z-40"/>
