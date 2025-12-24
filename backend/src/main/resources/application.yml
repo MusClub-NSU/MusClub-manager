@@ -1,0 +1,44 @@
+spring:
+  datasource:
+    url: jdbc:postgresql://localhost:5432/musclub
+    username: musclub
+    password: musclub
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    properties:
+      hibernate:
+        format_sql: true
+        default_schema: public
+    open-in-view: false
+  flyway:
+    enabled: true
+    schemas: public
+    default-schema: public
+    validate-on-migrate: false
+  mail:
+    host: smtp.gmail.com
+    port: 587
+    username: your@gmail.com
+    password: <APP_PASSWORD>
+    properties:
+      mail.smtp.auth: true
+      mail.smtp.starttls.enable: true
+
+server:
+  port: 8080
+
+springdoc:
+  swagger-ui:
+    path: /swagger
+  api-docs:
+    path: /api/docs
+  pageable-converter:
+    enabled: true
+  sort-converter:
+    enabled: true
+
+deepseek:
+  api-url: https://api.deepseek.com/v1/chat/completions
+  api-key: ${DEEPSEEK_API_KEY:test-api-key-for-testing-only}   # установи через переменную окружения
+  model: deepseek-chat           # или другой доступный модельный ID

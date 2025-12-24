@@ -1,0 +1,24 @@
+spring:
+  datasource:
+    url: jdbc:postgresql://localhost:5432/musclub_test
+    username: musclub
+    password: musclub
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    properties:
+      hibernate:
+        format_sql: true
+        default_schema: public
+    open-in-view: false
+  flyway:
+    enabled: true
+    schemas: public
+    default-schema: public
+    validate-on-migrate: false
+
+deepseek:
+  api-url: https://api.deepseek.com/v1/chat/completions
+  api-key: test-api-key-for-testing-only
+  model: deepseek-chat
+
