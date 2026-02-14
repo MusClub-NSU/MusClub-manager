@@ -27,7 +27,7 @@
     "@types/react-dom": "^19",
     "eslint": "^9",
     "eslint-config-next": "15.5.4",
-    "orval": "^8.0.0-rc.0",
+    "orval": "^7.3.0",
     "tailwindcss": "^4",
     "typescript": "^5"
   }
