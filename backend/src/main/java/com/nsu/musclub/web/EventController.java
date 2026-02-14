@@ -150,9 +150,32 @@ public class EventController {
         return socialMediaPostAiService.generateSocialMediaPost(eventId, request.getPlatform() != null ? request.getPlatform() : "general", request.getTone() != null ? request.getTone() : "casual");
     }
 
-    @PostMapping("/{eventId}/notifications/24h")
+    @Operation(summary = "Schedule push notifications for event participants",
+            description = "Schedules reminder notifications (24h, 2h, 15min before) for all event participants")
+    @PostMapping("/{eventId}/notifications/schedule")
     @ResponseStatus(HttpStatus.ACCEPTED)
-    public void schedule24hNotifications(@PathVariable Long eventId) {
-        notificationService.schedule24hBeforeForEventParticipants(eventId);
+    public java.util.Map<String, Object> scheduleNotifications(@PathVariable Long eventId) {
+        int count = notificationService.scheduleNotificationsForEvent(eventId);
+        return java.util.Map.of(
+                "eventId", eventId,
+                "scheduledCount", count,
+                "message", "Notifications scheduled successfully"
+        );
+    }
+
+    @Operation(summary = "Notify participants about event update")
+    @PostMapping("/{eventId}/notifications/update")
+    @ResponseStatus(HttpStatus.OK)
+    public java.util.Map<String, Object> notifyEventUpdated(@PathVariable Long eventId) {
+        int count = notificationService.notifyEventUpdated(eventId);
+        return java.util.Map.of("sentCount", count);
+    }
+
+    @Operation(summary = "Notify participants about event cancellation")
+    @PostMapping("/{eventId}/notifications/cancel")
+    @ResponseStatus(HttpStatus.OK)
+    public java.util.Map<String, Object> notifyEventCancelled(@PathVariable Long eventId) {
+        int count = notificationService.notifyEventCancelled(eventId);
+        return java.util.Map.of("sentCount", count);
     }
 }
