@@ -17,6 +17,7 @@ import org.springframework.web.bind.MissingServletRequestParameterException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
+import org.springframework.web.server.ResponseStatusException;
 import org.springframework.web.servlet.NoHandlerFoundException;
 
 import java.util.List;
@@ -39,6 +40,26 @@ public class GlobalExceptionHandler {
         );
 
         return ResponseEntity.status(ex.getStatus()).body(error);
+    }
+
+    @ExceptionHandler(ResponseStatusException.class)
+    public ResponseEntity<ErrorResponse> handleResponseStatusException(ResponseStatusException ex, HttpServletRequest request) {
+        int status = ex.getStatusCode().value();
+        HttpStatus httpStatus = HttpStatus.resolve(status);
+        String errorText = httpStatus != null ? httpStatus.getReasonPhrase() : "Unknown";
+        String message = ex.getReason() != null ? ex.getReason() : errorText;
+
+        log.warn("ResponseStatusException: {} - {}", status, message);
+
+        ErrorResponse error = new ErrorResponse(
+                status,
+                errorText,
+                "RESPONSE_STATUS_EXCEPTION",
+                message,
+                request.getRequestURI()
+        );
+
+        return ResponseEntity.status(status).body(error);
     }
 
     @ExceptionHandler(MethodArgumentNotValidException.class)

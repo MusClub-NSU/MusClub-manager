@@ -1,6 +1,11 @@
 import { User, UserCreateDto, UserUpdateDto, Event, EventCreateDto, EventUpdateDto, Page, Pageable, EventMember, EventMemberUpsertDto, PosterDescriptionResponse } from '../types/api';
 
-const API_BASE_URL = 'http://localhost:8080/api';
+// По умолчанию ходим на "/api" (Next.js proxy -> backend через rewrites в next.config.ts).
+// Можно переопределить в рантайме, установив window.ENV_API_URL (например, "https://my-backend.example.com").
+const API_BASE_URL =
+  typeof window !== 'undefined'
+    ? (window as unknown as { ENV_API_URL?: string }).ENV_API_URL || '/api'
+    : '/api';
 
 class ApiClient {
   private async request<T>(endpoint: string, options: RequestInit = {}): Promise<T> {

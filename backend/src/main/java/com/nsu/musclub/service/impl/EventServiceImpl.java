@@ -8,7 +8,9 @@ import com.nsu.musclub.mapper.EventMapper;
 import com.nsu.musclub.repository.EventRepository;
 import com.nsu.musclub.service.EventService;
 import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -39,7 +41,18 @@ public class EventServiceImpl implements EventService {
     @Override
     @Transactional(readOnly = true)
     public Page<EventResponseDto> list(Pageable pageable) {
-        return events.findAll(pageable).map(EventMapper::toDto);
+        Pageable effectivePageable = pageable;
+        if (pageable.getSort().isUnsorted()) {
+            effectivePageable = PageRequest.of(
+                    pageable.getPageNumber(),
+                    pageable.getPageSize(),
+                    Sort.by(
+                            Sort.Order.desc("startTime").nullsLast(),
+                            Sort.Order.desc("id")
+                    )
+            );
+        }
+        return events.findAll(effectivePageable).map(EventMapper::toDto);
     }
 
     @Override
@@ -60,9 +73,6 @@ public class EventServiceImpl implements EventService {
     }
 
     private void validateEventTimes(OffsetDateTime startTime, OffsetDateTime endTime) {
-        if (startTime != null && startTime.isBefore(OffsetDateTime.now())) {
-            throw new BadRequestException("Время начала должно быть в будущем");
-        }
         if (endTime != null && startTime != null && endTime.isBefore(startTime)) {
             throw new BadRequestException("Время окончания должно быть позже времени начала");
         }

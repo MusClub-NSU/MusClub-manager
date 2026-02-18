@@ -5,9 +5,12 @@
 
 import { useState, useEffect, useCallback } from 'react';
 
-const API_BASE_URL = typeof window !== 'undefined'
-  ? (window as unknown as { ENV_API_URL?: string }).ENV_API_URL || 'http://localhost:8080'
-  : 'http://localhost:8080';
+// По умолчанию используем относительный "/api/*" (Next.js proxy -> backend через rewrites).
+// Можно переопределить в рантайме, установив window.ENV_API_URL (например, "https://my-backend.example.com").
+const API_BASE_URL =
+  typeof window !== 'undefined'
+    ? (window as unknown as { ENV_API_URL?: string }).ENV_API_URL || ''
+    : '';
 
 interface PushSubscriptionState {
   isSupported: boolean;
