@@ -14,9 +14,11 @@ spring:
   flyway:
     enabled: false
 
+# VAPID ключи задаются через переменные окружения (никогда не храните приватный ключ в репозитории).
+# Сгенерировать: npx web-push generate-vapid-keys
 push:
-  vapid-public-key: "BKyxePrCfhVrA9q28oJXhbXxkHEyOxfK4L0G5-ZmEZwuBr4X3BSyRcjREBw89hm8XZRYVfCD0grkZaajqatVV6k"
-  vapid-private-key: "_klgyoDWGo0d1zT_THS5uAKrZ5ofvO67U1AE6TBz9H8"
+  vapid-public-key: ${VAPID_PUBLIC_KEY:}
+  vapid-private-key: ${VAPID_PRIVATE_KEY:}
   vapid-subject: mailto:admin@musclub.nsu.ru
   notification-icon: /icon-192x192.png
   notification-badge: /icon-192x192.png
