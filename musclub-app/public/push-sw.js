@@ -1,7 +1,9 @@
 
 self.addEventListener('push', (event) => {
   console.log('[SW] Push notification received:', event);
-
+  console.log('[SW] Event.data:', event.data);
+  console.log('[SW] Event.data type:', typeof event.data);
+  
   let data = {
     title: 'MusClub Manager',
     body: 'Новое уведомление',
@@ -14,22 +16,54 @@ self.addEventListener('push', (event) => {
 
   if (event.data) {
     try {
-      const payload = event.data.json();
-      data = { ...data, ...payload };
+      // Проверяем, есть ли данные
+      const hasData = event.data.arrayBuffer || event.data.text || event.data.json;
+      console.log('[SW] Has data methods:', { arrayBuffer: !!event.data.arrayBuffer, text: !!event.data.text, json: !!event.data.json });
+      
+      if (hasData) {
+        try {
+          const payload = event.data.json();
+          console.log('[SW] Parsed payload:', payload);
+          if (payload && typeof payload === 'object') {
+            data = { ...data, ...payload };
+          }
+        } catch (jsonError) {
+          console.warn('[SW] Failed to parse as JSON, trying text:', jsonError);
+          try {
+            const text = event.data.text();
+            console.log('[SW] Data as text:', text);
+            if (text) {
+              try {
+                const parsed = JSON.parse(text);
+                data = { ...data, ...parsed };
+              } catch {
+                data.body = text;
+              }
+            }
+          } catch (textError) {
+            console.error('[SW] Failed to get text:', textError);
+          }
+        }
+      } else {
+        console.warn('[SW] Event.data exists but has no data methods');
+      }
     } catch (e) {
       console.error('[SW] Failed to parse push data:', e);
-      data.body = event.data.text();
     }
+  } else {
+    console.warn('[SW] No event.data');
   }
+
+  console.log('[SW] Final notification data:', data);
 
   const options = {
     body: data.body,
     icon: data.icon,
     badge: data.badge,
-    tag: data.tag,
-    requireInteraction: data.requireInteraction,
+    tag: data.tag || 'default',
+    requireInteraction: data.requireInteraction || false,
     data: {
-      actionUrl: data.actionUrl,
+      actionUrl: data.actionUrl || '/',
       timestamp: Date.now()
     },
     vibrate: [100, 50, 100],
@@ -45,8 +79,16 @@ self.addEventListener('push', (event) => {
     ]
   };
 
+  console.log('[SW] Showing notification with options:', options);
+
   event.waitUntil(
     self.registration.showNotification(data.title, options)
+      .then(() => {
+        console.log('[SW] ✅ Notification shown successfully');
+      })
+      .catch((error) => {
+        console.error('[SW] ❌ Failed to show notification:', error);
+      })
   );
 });
 

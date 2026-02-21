@@ -15,8 +15,8 @@ spring:
     enabled: false
 
 push:
-  vapid-public-key: "BLrkc-3gcvpo4V6OkpBm1X9qsQ_O8qYVERu8F6ybBKX_FAmFooYJ-Dj-1oS7BT9W4bLKLOYESYc-hQiSHAphYjE"
-  vapid-private-key: "HWOmlHHey5cQt0d6vNbS-X-gF4jb1h28mr8sAq7d1FY"
+  vapid-public-key: "BKyxePrCfhVrA9q28oJXhbXxkHEyOxfK4L0G5-ZmEZwuBr4X3BSyRcjREBw89hm8XZRYVfCD0grkZaajqatVV6k"
+  vapid-private-key: "_klgyoDWGo0d1zT_THS5uAKrZ5ofvO67U1AE6TBz9H8"
   vapid-subject: mailto:admin@musclub.nsu.ru
   notification-icon: /icon-192x192.png
   notification-badge: /icon-192x192.png

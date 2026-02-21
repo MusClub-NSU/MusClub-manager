@@ -4,32 +4,21 @@ import React from 'react';
 import { usePushNotifications } from '@/hooks/usePushNotifications';
 
 interface PushNotificationSettingsProps {
-  userId: number;
   className?: string;
 }
 
 /**
- * Компонент для управления push-уведомлениями
+ * Компонент для отображения статуса push-уведомлений (авто-подписка при загрузке)
  */
-export function PushNotificationSettings({ userId, className = '' }: PushNotificationSettingsProps) {
+export function PushNotificationSettings({ className = '' }: PushNotificationSettingsProps) {
   const {
     isSupported,
     isSubscribed,
     isLoading,
     error,
     permission,
-    subscribe,
-    unsubscribe,
     sendTestNotification
   } = usePushNotifications();
-
-  const handleToggle = async () => {
-    if (isSubscribed) {
-      await unsubscribe();
-    } else {
-      await subscribe(userId);
-    }
-  };
 
   if (!isSupported) {
     return (
@@ -43,39 +32,17 @@ export function PushNotificationSettings({ userId, className = '' }: PushNotific
 
   return (
     <div className={`p-4 bg-white rounded-lg shadow ${className}`}>
-      <div className="flex items-center justify-between">
-        <div>
-          <h3 className="text-lg font-medium text-gray-900">
-            Push-уведомления
-          </h3>
-          <p className="text-sm text-gray-500">
-            {isSubscribed
+      <div>
+        <h3 className="text-lg font-medium text-gray-900">
+          Push-уведомления
+        </h3>
+        <p className="text-sm text-gray-500">
+          {isLoading
+            ? 'Подписка на уведомления...'
+            : isSubscribed
               ? 'Вы получаете уведомления о мероприятиях'
-              : 'Включите, чтобы получать напоминания'}
-          </p>
-        </div>
-
-        <button
-          onClick={handleToggle}
-          disabled={isLoading}
-          className={`
-            relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full 
-            border-2 border-transparent transition-colors duration-200 ease-in-out 
-            focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2
-            ${isSubscribed ? 'bg-indigo-600' : 'bg-gray-200'}
-            ${isLoading ? 'opacity-50 cursor-wait' : ''}
-          `}
-          role="switch"
-          aria-checked={isSubscribed}
-        >
-          <span
-            className={`
-              pointer-events-none inline-block h-5 w-5 transform rounded-full 
-              bg-white shadow ring-0 transition duration-200 ease-in-out
-              ${isSubscribed ? 'translate-x-5' : 'translate-x-0'}
-            `}
-          />
-        </button>
+              : 'Ожидание разрешения'}
+        </p>
       </div>
 
       {/* Статус разрешения */}
