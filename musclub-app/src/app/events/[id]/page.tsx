@@ -1118,7 +1118,12 @@ export default function EventDetailsPage() {
                     </>
                 ) : (
                     <>
-                        <Button view="outlined" className="min-w-[160px]" size="l" onClick={() => router.back()} disabled={visible}>
+                        <Button
+                            view="outlined"
+                            className="min-w-[160px]"
+                            size="l"
+                            onClick={() => { if (!visible) router.back(); }}
+                        >
                             Назад
                         </Button>
                         <Button

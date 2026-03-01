@@ -5,8 +5,10 @@ import { Button, Card, Text, Loader, Icon, Link} from '@gravity-ui/uikit';
 import { Plus, Pencil, TrashBin, Xmark } from '@gravity-ui/icons';
 import { useState } from 'react';
 import { User } from '../../types/api';
+import { useSidebar } from '../context/SidebarContext';
 
 export default function ParticipantsPage() {
+    const { visible: sidebarVisible } = useSidebar();
     const { users, loading, error, createUser, updateUser, deleteUser, refetch } = useUsers({ page: 0, size: 20 });
     const [isCreating, setIsCreating] = useState(false);
     const [editingUser, setEditingUser] = useState<User | null>(null);
@@ -122,7 +124,7 @@ export default function ParticipantsPage() {
                     <Button
                         view="action"
                         onClick={handleCreateUser}
-                        disabled={isCreating}
+                        disabled={isCreating || sidebarVisible}
                     >
                         <span className="flex items-center justify-center gap-2">
                         <Plus size={16} />
@@ -182,6 +184,7 @@ export default function ParticipantsPage() {
                                                     view="flat"
                                                     size="s"
                                                     onClick={() => handleEditUser(user)}
+                                                    disabled={sidebarVisible}
                                                 >
                                                     <Pencil size={14} />
                                                 </Button>
@@ -189,6 +192,7 @@ export default function ParticipantsPage() {
                                                     view="flat"
                                                     size="s"
                                                     onClick={() => handleDeleteUser(user.id)}
+                                                    disabled={sidebarVisible}
                                                 >
                                                     <TrashBin size={14} />
                                                 </Button>

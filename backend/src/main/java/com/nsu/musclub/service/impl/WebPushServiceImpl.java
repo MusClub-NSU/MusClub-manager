@@ -47,7 +47,7 @@ public class WebPushServiceImpl implements WebPushService {
         }
 
         try {
-            if (config.getVapidPublicKey() != null && config.getVapidPrivateKey() != null) {
+            if (isVapidConfigured()) {
                 pushService = new PushService()
                         .setPublicKey(config.getVapidPublicKey())
                         .setPrivateKey(config.getVapidPrivateKey())
@@ -59,6 +59,13 @@ public class WebPushServiceImpl implements WebPushService {
         } catch (GeneralSecurityException e) {
             log.error("Failed to initialize Web Push Service", e);
         }
+    }
+
+    private boolean isVapidConfigured() {
+        String publicKey = config.getVapidPublicKey();
+        String privateKey = config.getVapidPrivateKey();
+        return publicKey != null && !publicKey.isBlank()
+                && privateKey != null && !privateKey.isBlank();
     }
 
     @Override
