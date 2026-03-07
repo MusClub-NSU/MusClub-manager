@@ -1,21 +1,19 @@
 spring:
   datasource:
-    url: jdbc:postgresql://localhost:5433/musclub
-    username: musclub
-    password: musclub
+    url: ${SPRING_DATASOURCE_URL:jdbc:postgresql://localhost:5433/musclub}
+    username: ${SPRING_DATASOURCE_USERNAME:musclub}
+    password: ${SPRING_DATASOURCE_PASSWORD:musclub}
   jpa:
     hibernate:
-      ddl-auto: update
+      ddl-auto: validate
     properties:
       hibernate:
         format_sql: true
         default_schema: public
     open-in-view: false
   flyway:
-    enabled: false
+    enabled: true
 
-# VAPID ключи задаются через переменные окружения (никогда не храните приватный ключ в репозитории).
-# Сгенерировать: npx web-push generate-vapid-keys
 push:
   vapid-public-key: ${VAPID_PUBLIC_KEY:}
   vapid-private-key: ${VAPID_PRIVATE_KEY:}
@@ -39,6 +37,12 @@ springdoc:
     enabled: true
   sort-converter:
     enabled: true
+
+logging:
+  level:
+    com.nsu.musclub: DEBUG
+    org.springframework.web: INFO
+    org.hibernate.SQL: DEBUG
 
 deepseek:
   api-url: https://api.deepseek.com/v1/chat/completions
