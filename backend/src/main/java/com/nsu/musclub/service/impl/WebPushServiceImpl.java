@@ -41,23 +41,33 @@ public class WebPushServiceImpl implements WebPushService {
 
     @PostConstruct
     public void init() {
-        // Регистрация BouncyCastle провайдера для криптографии
         if (Security.getProvider(BouncyCastleProvider.PROVIDER_NAME) == null) {
             Security.addProvider(new BouncyCastleProvider());
+            log.debug("BouncyCastle provider registered");
         }
 
         try {
             if (isVapidConfigured()) {
+                log.info("VAPID configuration found. Initializing Web Push Service...");
+                log.debug("VAPID Public Key length: {}", config.getVapidPublicKey().length());
+
                 pushService = new PushService()
                         .setPublicKey(config.getVapidPublicKey())
                         .setPrivateKey(config.getVapidPrivateKey())
                         .setSubject(config.getVapidSubject());
+
                 log.info("Web Push Service initialized successfully");
             } else {
-                log.warn("VAPID keys not configured. Push notifications will not work.");
+                log.error("VAPID keys not configured! Push notifications will NOT work.");
+                log.error("Set environment variables: VAPID_PUBLIC_KEY and VAPID_PRIVATE_KEY");
+                log.error("Or configure in application.yml under push.vapid-*");
             }
         } catch (GeneralSecurityException e) {
-            log.error("Failed to initialize Web Push Service", e);
+            log.error("Failed to initialize Web Push Service due to security error", e);
+            throw new RuntimeException("Web Push Service initialization failed", e);
+        } catch (Exception e) {
+            log.error("Unexpected error during Web Push Service initialization", e);
+            throw new RuntimeException("Web Push Service initialization failed", e);
         }
     }
 
@@ -71,12 +81,16 @@ public class WebPushServiceImpl implements WebPushService {
     @Override
     public boolean sendPushNotification(PushSubscription subscription, PushMessageDto message) {
         if (pushService == null) {
-            log.warn("Push service not initialized, skipping notification");
+            log.error("Push service not initialized - VAPID keys may be missing");
             return false;
         }
 
         try {
-            // Добавляем иконку и badge из конфигурации
+            if (subscription == null || subscription.getEndpoint() == null) {
+                log.error("Invalid subscription: null or missing endpoint");
+                return false;
+            }
+
             if (message.getIcon() == null) {
                 message.setIcon(config.getNotificationIcon());
             }
@@ -84,26 +98,31 @@ public class WebPushServiceImpl implements WebPushService {
                 message.setBadge(config.getNotificationBadge());
             }
 
+            log.debug("Preparing push payload - title: {}, body: {}", message.getTitle(), message.getBody());
             String payload = objectMapper.writeValueAsString(message);
+            log.debug("Payload size: {} bytes", payload.length());
 
             Subscription webPushSubscription = new Subscription(
                     subscription.getEndpoint(),
                     new Subscription.Keys(subscription.getP256dhKey(), subscription.getAuthKey())
             );
 
+            log.debug("Sending notification to endpoint: {}...",
+                    subscription.getEndpoint().substring(0, Math.min(50, subscription.getEndpoint().length())));
+
             Notification notification = new Notification(webPushSubscription, payload);
             pushService.send(notification);
 
-            log.debug("Push notification sent to endpoint: {}",
-                    subscription.getEndpoint().substring(0, Math.min(50, subscription.getEndpoint().length())));
+            log.info("Push notification sent successfully to subscription id={}", subscription.getId());
             return true;
 
         } catch (Exception e) {
-            log.error("Failed to send push notification to subscription id={}", subscription.getId(), e);
+            log.error("Failed to send push notification to subscription id={}: {} - {}",
+                    subscription.getId(), e.getClass().getSimpleName(), e.getMessage());
+            log.debug("Full error stack trace:", e);
 
-            // Если endpoint больше недействителен, деактивируем подписку
             if (isSubscriptionExpired(e)) {
-                log.info("Deactivating expired subscription id={}", subscription.getId());
+                log.warn("Subscription id={} expired, marking as inactive", subscription.getId());
                 subscription.setActive(false);
                 subscriptionRepository.save(subscription);
             }
@@ -115,21 +134,42 @@ public class WebPushServiceImpl implements WebPushService {
     @Override
     @Transactional(readOnly = true)
     public int sendPushToUser(Long userId, PushMessageDto message) {
-        List<PushSubscription> subscriptions = subscriptionRepository.findByUserIdAndActiveTrue(userId);
-
-        if (subscriptions.isEmpty()) {
-            log.debug("No active subscriptions for user id={}", userId);
+        if (userId == null) {
+            log.error("Cannot send push: userId is null");
             return 0;
         }
 
+        log.info("Attempting to send push notification to user id={}", userId);
+
+        List<PushSubscription> subscriptions = subscriptionRepository.findByUserIdAndActiveTrue(userId);
+
+        if (subscriptions.isEmpty()) {
+            log.warn("No active subscriptions found for user id={}", userId);
+            return 0;
+        }
+
+        log.info("Found {} active subscription(s) for user id={}", subscriptions.size(), userId);
+
         int successCount = 0;
+        int failureCount = 0;
+
         for (PushSubscription subscription : subscriptions) {
-            if (sendPushNotification(subscription, message)) {
-                successCount++;
+            log.debug("Processing subscription id={}", subscription.getId());
+            try {
+                if (sendPushNotification(subscription, message)) {
+                    successCount++;
+                } else {
+                    failureCount++;
+                }
+            } catch (Exception e) {
+                log.error("Unexpected error sending to subscription id={}: {}", subscription.getId(), e.getMessage(), e);
+                failureCount++;
             }
         }
 
-        log.info("Sent {} of {} push notifications to user id={}", successCount, subscriptions.size(), userId);
+        log.info("Push notification delivery summary for user id={}: {} sent, {} failed",
+                userId, successCount, failureCount);
+
         return successCount;
     }
 

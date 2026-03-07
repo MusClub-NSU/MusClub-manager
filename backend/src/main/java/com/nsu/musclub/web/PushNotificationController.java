@@ -11,6 +11,7 @@ import jakarta.validation.Valid;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -70,27 +71,55 @@ public class PushNotificationController {
     @Operation(summary = "Отправить push-уведомление пользователю",
                description = "Отправляет push-уведомление конкретному пользователю")
     @PostMapping("/send")
-    public Map<String, Object> sendPushToUser(@RequestBody Map<String, Object> body) {
-        Long userId = ((Number) body.get("userId")).longValue();
-        String title = (String) body.getOrDefault("title", "Уведомление");
-        String bodyText = (String) body.getOrDefault("body", "");
-        String icon = (String) body.getOrDefault("icon", "/icon-192x192.png");
-        String badge = (String) body.getOrDefault("badge", "/icon-192x192.png");
+    public ResponseEntity<?> sendPushToUser(@RequestBody Map<String, Object> body) {
+        try {
+            if (body == null || body.isEmpty()) {
+                return ResponseEntity.badRequest().body(Map.of(
+                        "success", false,
+                        "message", "Request body is empty"
+                ));
+            }
 
-        PushMessageDto message = PushMessageDto.builder()
-                .title(title)
-                .body(bodyText)
-                .icon(icon)
-                .badge(badge)
-                .build();
+            Object userIdObj = body.get("userId");
+            if (userIdObj == null) {
+                return ResponseEntity.badRequest().body(Map.of(
+                        "success", false,
+                        "message", "userId is required"
+                ));
+            }
 
-        int sentCount = webPushService.sendPushToUser(userId, message);
+            Long userId = ((Number) userIdObj).longValue();
+            String title = (String) body.getOrDefault("title", "Уведомление");
+            String bodyText = (String) body.getOrDefault("body", "");
+            String icon = (String) body.getOrDefault("icon", "/icon-192x192.png");
+            String badge = (String) body.getOrDefault("badge", "/icon-192x192.png");
 
-        return Map.of(
-                "success", sentCount > 0,
-                "sentCount", sentCount,
-                "message", sentCount > 0 ? "Уведомление отправлено" : "Нет активных подписок"
-        );
+            PushMessageDto message = PushMessageDto.builder()
+                    .title(title)
+                    .body(bodyText)
+                    .icon(icon)
+                    .badge(badge)
+                    .build();
+
+            int sentCount = webPushService.sendPushToUser(userId, message);
+
+            return ResponseEntity.ok(Map.of(
+                    "success", sentCount > 0,
+                    "sentCount", sentCount,
+                    "message", sentCount > 0 ? "Уведомление успешно отправлено" : "Нет активных подписок для пользователя"
+            ));
+
+        } catch (NumberFormatException e) {
+            return ResponseEntity.badRequest().body(Map.of(
+                    "success", false,
+                    "message", "Invalid userId format: " + e.getMessage()
+            ));
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(Map.of(
+                    "success", false,
+                    "message", "Error sending push notification: " + e.getMessage()
+            ));
+        }
     }
 
     @Operation(summary = "Проверить статус подписки пользователя")
@@ -100,6 +129,27 @@ public class PushNotificationController {
                 "subscribed", subscriptionService.isUserSubscribed(userId),
                 "subscriptionCount", subscriptionService.getSubscriptionCount(userId)
         );
+    }
+
+
+    @Operation(summary = "Отладка: получить детали подписок пользователя")
+    @GetMapping("/debug/user/{userId}")
+    public ResponseEntity<?> debugUserSubscriptions(@PathVariable Long userId) {
+        try {
+            List<PushSubscriptionResponseDto> subscriptions = subscriptionService.getSubscriptionsForUser(userId);
+
+            return ResponseEntity.ok(Map.of(
+                    "userId", userId,
+                    "subscriptionCount", subscriptions.size(),
+                    "subscriptions", subscriptions,
+                    "message", subscriptions.isEmpty() ? "No active subscriptions" : "Subscriptions found"
+            ));
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(Map.of(
+                    "error", e.getMessage(),
+                    "type", e.getClass().getSimpleName()
+            ));
+        }
     }
 
 
