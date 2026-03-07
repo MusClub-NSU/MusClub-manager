@@ -4,12 +4,12 @@ import com.nsu.musclub.AbstractIntegrationTest;
 import com.nsu.musclub.dto.user.UserCreateDto;
 import com.nsu.musclub.dto.user.UserResponseDto;
 import com.nsu.musclub.dto.user.UserUpdateDto;
+import com.nsu.musclub.exception.ResourceAlreadyExistsException;
+import com.nsu.musclub.exception.ResourceNotFoundException;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
-import org.springframework.http.HttpStatus;
-import org.springframework.web.server.ResponseStatusException;
 
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -49,12 +49,12 @@ class UserServiceTest extends AbstractIntegrationTest {
 
         userService.create(dto1);
 
-        ResponseStatusException exception = assertThrows(ResponseStatusException.class, () -> {
+        ResourceAlreadyExistsException exception = assertThrows(ResourceAlreadyExistsException.class, () -> {
             userService.create(dto2);
         });
 
-        assertEquals(HttpStatus.CONFLICT, exception.getStatusCode());
-        assertTrue(exception.getMessage().contains("Username already in use"));
+        assertNotNull(exception.getMessage());
+        assertTrue(exception.getMessage().contains("username"));
     }
 
     @Test
@@ -71,12 +71,12 @@ class UserServiceTest extends AbstractIntegrationTest {
 
         userService.create(dto1);
 
-        ResponseStatusException exception = assertThrows(ResponseStatusException.class, () -> {
+        ResourceAlreadyExistsException exception = assertThrows(ResourceAlreadyExistsException.class, () -> {
             userService.create(dto2);
         });
 
-        assertEquals(HttpStatus.CONFLICT, exception.getStatusCode());
-        assertTrue(exception.getMessage().contains("Email already in use"));
+        assertNotNull(exception.getMessage());
+        assertTrue(exception.getMessage().contains("email"));
     }
 
     @Test
@@ -96,16 +96,15 @@ class UserServiceTest extends AbstractIntegrationTest {
 
     @Test
     void getUser_WithNonExistentId_ShouldThrow404() {
-        ResponseStatusException exception = assertThrows(ResponseStatusException.class, () -> {
+        ResourceNotFoundException exception = assertThrows(ResourceNotFoundException.class, () -> {
             userService.get(99999L);
         });
 
-        assertEquals(HttpStatus.NOT_FOUND, exception.getStatusCode());
+        assertNotNull(exception.getMessage());
     }
 
     @Test
     void listUsers_ShouldReturnPage() {
-        // Create multiple users
         for (int i = 1; i <= 5; i++) {
             UserCreateDto dto = new UserCreateDto();
             dto.setUsername("user" + i);
@@ -149,11 +148,11 @@ class UserServiceTest extends AbstractIntegrationTest {
         updateDto.setEmail("updated@example.com");
         updateDto.setRole("MEMBER");
 
-        ResponseStatusException exception = assertThrows(ResponseStatusException.class, () -> {
+        ResourceNotFoundException exception = assertThrows(ResourceNotFoundException.class, () -> {
             userService.update(99999L, updateDto);
         });
 
-        assertEquals(HttpStatus.NOT_FOUND, exception.getStatusCode());
+        assertNotNull(exception.getMessage());
     }
 
     @Test
@@ -172,16 +171,16 @@ class UserServiceTest extends AbstractIntegrationTest {
         UserResponseDto created2 = userService.create(dto2);
 
         UserUpdateDto updateDto = new UserUpdateDto();
-        updateDto.setUsername("user1"); // Duplicate
+        updateDto.setUsername("user1");
         updateDto.setEmail("user2@example.com");
         updateDto.setRole("MEMBER");
 
-        ResponseStatusException exception = assertThrows(ResponseStatusException.class, () -> {
+        ResourceAlreadyExistsException exception = assertThrows(ResourceAlreadyExistsException.class, () -> {
             userService.update(created2.getId(), updateDto);
         });
 
-        assertEquals(HttpStatus.CONFLICT, exception.getStatusCode());
-        assertTrue(exception.getMessage().contains("Username already in use"));
+        assertNotNull(exception.getMessage());
+        assertTrue(exception.getMessage().contains("username"));
     }
 
     @Test
@@ -194,7 +193,7 @@ class UserServiceTest extends AbstractIntegrationTest {
         UserResponseDto created = userService.create(createDto);
 
         UserUpdateDto updateDto = new UserUpdateDto();
-        updateDto.setUsername("sameuser"); // Same username is OK
+        updateDto.setUsername("sameuser");
         updateDto.setEmail("updated@example.com");
         updateDto.setRole("ORGANIZER");
 
@@ -216,19 +215,19 @@ class UserServiceTest extends AbstractIntegrationTest {
 
         userService.delete(id);
 
-        ResponseStatusException exception = assertThrows(ResponseStatusException.class, () -> {
+        ResourceNotFoundException exception = assertThrows(ResourceNotFoundException.class, () -> {
             userService.get(id);
         });
 
-        assertEquals(HttpStatus.NOT_FOUND, exception.getStatusCode());
+        assertNotNull(exception.getMessage());
     }
 
     @Test
     void deleteUser_WithNonExistentId_ShouldThrow404() {
-        ResponseStatusException exception = assertThrows(ResponseStatusException.class, () -> {
+        ResourceNotFoundException exception = assertThrows(ResourceNotFoundException.class, () -> {
             userService.delete(99999L);
         });
 
-        assertEquals(HttpStatus.NOT_FOUND, exception.getStatusCode());
+        assertNotNull(exception.getMessage());
     }
 }

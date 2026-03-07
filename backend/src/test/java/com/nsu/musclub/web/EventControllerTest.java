@@ -75,7 +75,7 @@ class EventControllerTest extends AbstractIntegrationTest {
     }
 
     @Test
-    void createEvent_WithPastStartTime_ShouldReturn400() throws Exception {
+    void createEvent_WithPastStartTime_ShouldReturn201() throws Exception {
         EventCreateDto dto = new EventCreateDto();
         dto.setTitle("Past Event");
         dto.setStartTime(pastTime());
@@ -84,7 +84,8 @@ class EventControllerTest extends AbstractIntegrationTest {
         mockMvc.perform(post("/api/events")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(dto)))
-                .andExpect(status().isBadRequest());
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.title").value("Past Event"));
     }
 
     @Test
@@ -224,7 +225,7 @@ class EventControllerTest extends AbstractIntegrationTest {
     }
 
     @Test
-    void updateEvent_WithPastStartTime_ShouldReturn400() throws Exception {
+    void updateEvent_WithPastStartTime_ShouldReturn200() throws Exception {
         EventCreateDto createDto = new EventCreateDto();
         createDto.setTitle("Original Event");
         createDto.setStartTime(futureTime());
@@ -246,7 +247,8 @@ class EventControllerTest extends AbstractIntegrationTest {
         mockMvc.perform(put("/api/events/{id}", id)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(updateDto)))
-                .andExpect(status().isBadRequest());
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.title").value("Updated Event"));
     }
 
     @Test

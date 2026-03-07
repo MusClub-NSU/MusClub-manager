@@ -123,8 +123,13 @@ public class WebPushServiceImpl implements WebPushService {
 
             if (isSubscriptionExpired(e)) {
                 log.warn("Subscription id={} expired, marking as inactive", subscription.getId());
-                subscription.setActive(false);
-                subscriptionRepository.save(subscription);
+                try {
+                    subscription.setActive(false);
+                    subscriptionRepository.save(subscription);
+                } catch (Exception saveEx) {
+                    log.error("Failed to deactivate expired subscription id={}: {}",
+                            subscription.getId(), saveEx.getMessage());
+                }
             }
 
             return false;
@@ -132,7 +137,7 @@ public class WebPushServiceImpl implements WebPushService {
     }
 
     @Override
-    @Transactional(readOnly = true)
+    @Transactional
     public int sendPushToUser(Long userId, PushMessageDto message) {
         if (userId == null) {
             log.error("Cannot send push: userId is null");
