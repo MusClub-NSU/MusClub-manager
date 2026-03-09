@@ -3,6 +3,7 @@ import "./globals.css";
 import GravityProvider from "./GravityProvider";
 import Sidebar from "./components/Sidebar";
 import { SidebarProvider } from './context/SidebarContext';
+import { PushNotificationInit } from './components/PushNotificationInit';
 
 import '@gravity-ui/uikit/styles/fonts.css';
 import '@gravity-ui/uikit/styles/styles.css';
@@ -24,6 +25,7 @@ export default function RootLayout({
       <body className="antialiased">
       <SidebarProvider>
         <GravityProvider>
+            <PushNotificationInit />
             <Sidebar />
             {children}
         </GravityProvider>

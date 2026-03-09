@@ -3,12 +3,27 @@ package com.nsu.musclub.domain;
 import jakarta.persistence.*;
 import java.time.OffsetDateTime;
 
+/**
+ * Push-уведомление о мероприятии
+ */
 @Entity
 @Table(name = "event_notifications")
 public class EventNotification {
 
     public enum Status {
-        PENDING, SENT, FAILED
+        PENDING,    // Ожидает отправки
+        SENT,       // Успешно отправлено
+        FAILED,     // Ошибка при отправке
+        CANCELLED   // Отменено (мероприятие отменено/удалено)
+    }
+
+    public enum NotificationType {
+        REMINDER_24H,      // Напоминание за 24 часа
+        REMINDER_2H,       // Напоминание за 2 часа
+        REMINDER_15MIN,    // Напоминание за 15 минут
+        EVENT_UPDATED,     // Мероприятие обновлено
+        EVENT_CANCELLED,   // Мероприятие отменено
+        CUSTOM             // Кастомное уведомление
     }
 
     @Id
@@ -33,18 +48,45 @@ public class EventNotification {
     @Column(nullable = false, length = 32)
     private Status status = Status.PENDING;
 
-    @Column(nullable = false, columnDefinition = "TEXT")
-    private String subject;
+    @Enumerated(EnumType.STRING)
+    @Column(name = "notification_type", nullable = false, length = 32)
+    private NotificationType notificationType = NotificationType.REMINDER_24H;
+
+    @Column(nullable = false, length = 255)
+    private String title;
 
     @Column(nullable = false, columnDefinition = "TEXT")
     private String body;
 
+    /**
+     * URL для перехода при клике на уведомление
+     */
+    @Column(name = "action_url", length = 500)
+    private String actionUrl;
+
+    /**
+     * Количество попыток отправки
+     */
+    @Column(name = "retry_count", nullable = false)
+    private int retryCount = 0;
+
+    /**
+     * Сообщение об ошибке (если status = FAILED)
+     */
+    @Column(name = "error_message", columnDefinition = "TEXT")
+    private String errorMessage;
+
     @Column(name = "created_at", nullable = false)
     private OffsetDateTime createdAt = OffsetDateTime.now();
 
+    // Getters and Setters
 
     public Long getId() {
         return id;
+    }
+
+    public void setId(Long id) {
+        this.id = id;
     }
 
     public Event getEvent() {
@@ -87,12 +129,20 @@ public class EventNotification {
         this.status = status;
     }
 
-    public String getSubject() {
-        return subject;
+    public NotificationType getNotificationType() {
+        return notificationType;
     }
 
-    public void setSubject(String subject) {
-        this.subject = subject;
+    public void setNotificationType(NotificationType notificationType) {
+        this.notificationType = notificationType;
+    }
+
+    public String getTitle() {
+        return title;
+    }
+
+    public void setTitle(String title) {
+        this.title = title;
     }
 
     public String getBody() {
@@ -103,11 +153,39 @@ public class EventNotification {
         this.body = body;
     }
 
+    public String getActionUrl() {
+        return actionUrl;
+    }
+
+    public void setActionUrl(String actionUrl) {
+        this.actionUrl = actionUrl;
+    }
+
+    public int getRetryCount() {
+        return retryCount;
+    }
+
+    public void setRetryCount(int retryCount) {
+        this.retryCount = retryCount;
+    }
+
+    public String getErrorMessage() {
+        return errorMessage;
+    }
+
+    public void setErrorMessage(String errorMessage) {
+        this.errorMessage = errorMessage;
+    }
+
     public OffsetDateTime getCreatedAt() {
         return createdAt;
     }
 
     public void setCreatedAt(OffsetDateTime createdAt) {
         this.createdAt = createdAt;
+    }
+
+    public void incrementRetryCount() {
+        this.retryCount++;
     }
 }

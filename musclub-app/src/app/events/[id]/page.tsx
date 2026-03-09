@@ -437,7 +437,6 @@ export default function EventDetailsPage() {
                                 onChange={(e) =>
                                     setEditData({...editData, startTime: e.target.value})
                                 }
-                                min={new Date((Date.now() + 24 * 60 * 60 * 1000)).toISOString().slice(0, 16)}
                                 className="px-2 py-1 sm:px-3 sm:py-2 border rounded-lg bg-[--g-color-base-generic-hover] text-[--g-color-text-primary] text-sm sm:text-base"
                             />
                         ) : (
@@ -1119,7 +1118,12 @@ export default function EventDetailsPage() {
                     </>
                 ) : (
                     <>
-                        <Button view="outlined" className="min-w-[160px]" size="l" onClick={() => router.back()} disabled={visible}>
+                        <Button
+                            view="outlined"
+                            className="min-w-[160px]"
+                            size="l"
+                            onClick={() => { if (!visible) router.back(); }}
+                        >
                             Назад
                         </Button>
                         <Button

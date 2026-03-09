@@ -7,13 +7,33 @@ services:
       POSTGRES_USER: musclub
       POSTGRES_PASSWORD: musclub
     ports:
-      - "5432:5432"
+      - "5433:5432"
     volumes:
       - db_data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U musclub -d musclub"]
+      test: [ "CMD-SHELL", "pg_isready -U musclub -d musclub" ]
       interval: 5s
       timeout: 5s
       retries: 10
+
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: musclub_app
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:postgresql://db:5432/musclub
+      SPRING_DATASOURCE_USERNAME: musclub
+      SPRING_DATASOURCE_PASSWORD: musclub
+      VAPID_PUBLIC_KEY: BLrkc-3gcvpo4V6OkpBm1X9qsQ_O8qYVERu8F6ybBKX_FAmFooYJ-Dj-1oS7BT9W4bLKLOYESYc-hQiSHAphYjE
+      VAPID_PRIVATE_KEY: HWOmlHHey5cQt0d6vNbS-X-gF4jb1h28mr8sAq7d1FY
+    ports:
+      - "8080:8080"
+    depends_on:
+      db:
+        condition: service_healthy
+    volumes:
+      - ./src:/app/src
+
 volumes:
   db_data:

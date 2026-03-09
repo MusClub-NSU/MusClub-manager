@@ -6,6 +6,7 @@ import { Card, Button, Text, Icon, Loader, Select} from '@gravity-ui/uikit';
 import { Person, LogoTelegram, Calendar, Tags, Pencil } from '@gravity-ui/icons';
 import { useUsers } from '../../../hooks/useApi';
 import { useSidebar } from '../../context/SidebarContext';
+import { PushNotificationSettings } from '../../components/PushNotificationSettings';
 
 export default function UserDetailsPage() {
     const params = useParams();
@@ -203,6 +204,10 @@ export default function UserDetailsPage() {
                 </Card>
             </section>
 
+            {/* Push-уведомления */}
+            <section className="max-w-4xl mx-auto w-full px-4">
+                <PushNotificationSettings />
+            </section>
 
             {/* Действия */}
             <div className="flex justify-center gap-6 mt-8">

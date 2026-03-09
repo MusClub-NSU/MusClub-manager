@@ -22,7 +22,9 @@ dependencies {
     implementation("org.flywaydb:flyway-database-postgresql:10.20.0")
 
     implementation("org.springdoc:springdoc-openapi-starter-webmvc-ui:2.6.0")
-    implementation("org.springframework.boot:spring-boot-starter-mail")
+
+    implementation("nl.martijndwars:web-push:5.1.1")
+    implementation("org.bouncycastle:bcprov-jdk18on:1.77")
 
     runtimeOnly("org.postgresql:postgresql")
 

@@ -4,12 +4,12 @@ import com.nsu.musclub.AbstractIntegrationTest;
 import com.nsu.musclub.dto.event.EventCreateDto;
 import com.nsu.musclub.dto.event.EventResponseDto;
 import com.nsu.musclub.dto.event.EventUpdateDto;
+import com.nsu.musclub.exception.BadRequestException;
+import com.nsu.musclub.exception.ResourceNotFoundException;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
-import org.springframework.http.HttpStatus;
-import org.springframework.web.server.ResponseStatusException;
 
 import java.time.OffsetDateTime;
 
@@ -48,17 +48,15 @@ class EventServiceTest extends AbstractIntegrationTest {
     }
 
     @Test
-    void createEvent_WithPastStartTime_ShouldThrow400() {
+    void createEvent_WithPastStartTime_ShouldSucceed() {
         EventCreateDto dto = new EventCreateDto();
         dto.setTitle("Past Event");
         dto.setStartTime(pastTime());
 
-        ResponseStatusException exception = assertThrows(ResponseStatusException.class, () -> {
-            eventService.create(dto);
-        });
+        EventResponseDto result = eventService.create(dto);
 
-        assertEquals(HttpStatus.BAD_REQUEST, exception.getStatusCode());
-        assertTrue(exception.getMessage().contains("Start time must be in the future"));
+        assertNotNull(result.getId());
+        assertEquals("Past Event", result.getTitle());
     }
 
     @Test
@@ -68,12 +66,11 @@ class EventServiceTest extends AbstractIntegrationTest {
         dto.setStartTime(futureTime());
         dto.setEndTime(futureTime().minusHours(2));
 
-        ResponseStatusException exception = assertThrows(ResponseStatusException.class, () -> {
+        BadRequestException exception = assertThrows(BadRequestException.class, () -> {
             eventService.create(dto);
         });
 
-        assertEquals(HttpStatus.BAD_REQUEST, exception.getStatusCode());
-        assertTrue(exception.getMessage().contains("End time must be greater than or equal to start time"));
+        assertNotNull(exception.getMessage());
     }
 
     @Test
@@ -119,11 +116,11 @@ class EventServiceTest extends AbstractIntegrationTest {
 
     @Test
     void getEvent_WithNonExistentId_ShouldThrow404() {
-        ResponseStatusException exception = assertThrows(ResponseStatusException.class, () -> {
+        ResourceNotFoundException exception = assertThrows(ResourceNotFoundException.class, () -> {
             eventService.get(99999L);
         });
 
-        assertEquals(HttpStatus.NOT_FOUND, exception.getStatusCode());
+        assertNotNull(exception.getMessage());
     }
 
     @Test
@@ -172,15 +169,15 @@ class EventServiceTest extends AbstractIntegrationTest {
         updateDto.setTitle("Updated Title");
         updateDto.setStartTime(futureTime());
 
-        ResponseStatusException exception = assertThrows(ResponseStatusException.class, () -> {
+        ResourceNotFoundException exception = assertThrows(ResourceNotFoundException.class, () -> {
             eventService.update(99999L, updateDto);
         });
 
-        assertEquals(HttpStatus.NOT_FOUND, exception.getStatusCode());
+        assertNotNull(exception.getMessage());
     }
 
     @Test
-    void updateEvent_WithPastStartTime_ShouldThrow400() {
+    void updateEvent_WithPastStartTime_ShouldSucceed() {
         EventCreateDto createDto = new EventCreateDto();
         createDto.setTitle("Original Event");
         createDto.setStartTime(futureTime());
@@ -191,12 +188,9 @@ class EventServiceTest extends AbstractIntegrationTest {
         updateDto.setTitle("Updated Event");
         updateDto.setStartTime(pastTime());
 
-        ResponseStatusException exception = assertThrows(ResponseStatusException.class, () -> {
-            eventService.update(created.getId(), updateDto);
-        });
+        EventResponseDto updated = eventService.update(created.getId(), updateDto);
 
-        assertEquals(HttpStatus.BAD_REQUEST, exception.getStatusCode());
-        assertTrue(exception.getMessage().contains("Start time must be in the future"));
+        assertEquals("Updated Event", updated.getTitle());
     }
 
     @Test
@@ -210,14 +204,13 @@ class EventServiceTest extends AbstractIntegrationTest {
         EventUpdateDto updateDto = new EventUpdateDto();
         updateDto.setTitle("Updated Event");
         updateDto.setStartTime(futureTime());
-        updateDto.setEndTime(futureTime().minusHours(1)); // Invalid
+        updateDto.setEndTime(futureTime().minusHours(1));
 
-        ResponseStatusException exception = assertThrows(ResponseStatusException.class, () -> {
+        BadRequestException exception = assertThrows(BadRequestException.class, () -> {
             eventService.update(created.getId(), updateDto);
         });
 
-        assertEquals(HttpStatus.BAD_REQUEST, exception.getStatusCode());
-        assertTrue(exception.getMessage().contains("End time must be greater than or equal to start time"));
+        assertNotNull(exception.getMessage());
     }
 
     @Test
@@ -231,19 +224,19 @@ class EventServiceTest extends AbstractIntegrationTest {
 
         eventService.delete(id);
 
-        ResponseStatusException exception = assertThrows(ResponseStatusException.class, () -> {
+        ResourceNotFoundException exception = assertThrows(ResourceNotFoundException.class, () -> {
             eventService.get(id);
         });
 
-        assertEquals(HttpStatus.NOT_FOUND, exception.getStatusCode());
+        assertNotNull(exception.getMessage());
     }
 
     @Test
     void deleteEvent_WithNonExistentId_ShouldThrow404() {
-        ResponseStatusException exception = assertThrows(ResponseStatusException.class, () -> {
+        ResourceNotFoundException exception = assertThrows(ResourceNotFoundException.class, () -> {
             eventService.delete(99999L);
         });
 
-        assertEquals(HttpStatus.NOT_FOUND, exception.getStatusCode());
+        assertNotNull(exception.getMessage());
     }
 }

@@ -219,6 +219,7 @@ export default function EventsPage() {
                                         view="flat"
                                         size="s"
                                         onClick={() => handleEditEvent(event)}
+                                        disabled={visible}
                                     >
                                         <Pencil size={14} />
                                     </Button>
@@ -226,6 +227,7 @@ export default function EventsPage() {
                                         view="flat"
                                         size="s"
                                         onClick={() => handleDeleteEvent(event.id)}
+                                        disabled={visible}
                                     >
                                         <TrashBin size={14} />
                                     </Button>

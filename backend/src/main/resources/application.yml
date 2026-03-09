@@ -1,8 +1,8 @@
 spring:
   datasource:
-    url: jdbc:postgresql://localhost:5432/musclub
-    username: musclub
-    password: musclub
+    url: ${SPRING_DATASOURCE_URL:jdbc:postgresql://localhost:5433/musclub}
+    username: ${SPRING_DATASOURCE_USERNAME:musclub}
+    password: ${SPRING_DATASOURCE_PASSWORD:musclub}
   jpa:
     hibernate:
       ddl-auto: validate
@@ -13,17 +13,17 @@ spring:
     open-in-view: false
   flyway:
     enabled: true
-    schemas: public
-    default-schema: public
-    validate-on-migrate: false
-  mail:
-    host: smtp.gmail.com
-    port: 587
-    username: your@gmail.com
-    password: <APP_PASSWORD>
-    properties:
-      mail.smtp.auth: true
-      mail.smtp.starttls.enable: true
+
+push:
+  vapid-public-key: ${VAPID_PUBLIC_KEY:}
+  vapid-private-key: ${VAPID_PRIVATE_KEY:}
+  vapid-subject: mailto:admin@musclub.nsu.ru
+  notification-icon: /icon-192x192.png
+  notification-badge: /icon-192x192.png
+  max-retries: 3
+  scheduler-interval: 30000
+  notification-retention-days: 30
+  default-reminder-intervals: 1440, 120, 15
 
 server:
   port: 8080
@@ -38,7 +38,13 @@ springdoc:
   sort-converter:
     enabled: true
 
+logging:
+  level:
+    com.nsu.musclub: DEBUG
+    org.springframework.web: INFO
+    org.hibernate.SQL: DEBUG
+
 deepseek:
   api-url: https://api.deepseek.com/v1/chat/completions
-  api-key: ${DEEPSEEK_API_KEY:test-api-key-for-testing-only}   # установи через переменную окружения
-  model: deepseek-chat           # или другой доступный модельный ID
+  api-key: ${DEEPSEEK_API_KEY:test-api-key-for-testing-only}
+  model: deepseek-chat

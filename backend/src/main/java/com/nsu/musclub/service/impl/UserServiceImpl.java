@@ -2,15 +2,15 @@ package com.nsu.musclub.service.impl;
 
 import com.nsu.musclub.domain.User;
 import com.nsu.musclub.dto.user.*;
+import com.nsu.musclub.exception.ResourceAlreadyExistsException;
+import com.nsu.musclub.exception.ResourceNotFoundException;
 import com.nsu.musclub.mapper.UserMapper;
 import com.nsu.musclub.repository.UserRepository;
 import com.nsu.musclub.service.UserService;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
-import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import org.springframework.web.server.ResponseStatusException;
 
 @Service
 @Transactional
@@ -23,10 +23,12 @@ public class UserServiceImpl implements UserService {
 
     @Override
     public UserResponseDto create(UserCreateDto dto) {
-        if (users.existsByUsername(dto.getUsername()))
-            throw new ResponseStatusException(HttpStatus.CONFLICT, "Username already in use");
-        if (users.existsByEmail(dto.getEmail()))
-            throw new ResponseStatusException(HttpStatus.CONFLICT, "Email already in use");
+        if (users.existsByUsername(dto.getUsername())) {
+            throw new ResourceAlreadyExistsException("Пользователь", "username", dto.getUsername());
+        }
+        if (users.existsByEmail(dto.getEmail())) {
+            throw new ResourceAlreadyExistsException("Пользователь", "email", dto.getEmail());
+        }
         return UserMapper.toDto(users.save(UserMapper.toEntity(dto)));
     }
 
@@ -34,7 +36,7 @@ public class UserServiceImpl implements UserService {
     @Transactional(readOnly = true)
     public UserResponseDto get(Long id) {
         return users.findById(id).map(UserMapper::toDto)
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND));
+                .orElseThrow(() -> new ResourceNotFoundException("Пользователь", id));
     }
 
     @Override
@@ -45,18 +47,25 @@ public class UserServiceImpl implements UserService {
 
     @Override
     public UserResponseDto update(Long id, UserUpdateDto dto) {
-        var u = users.findById(id).orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND));
-        if (!u.getUsername().equals(dto.getUsername()) && users.existsByUsername(dto.getUsername()))
-            throw new ResponseStatusException(HttpStatus.CONFLICT, "Username already in use");
-        if (!u.getEmail().equals(dto.getEmail()) && users.existsByEmail(dto.getEmail()))
-            throw new ResponseStatusException(HttpStatus.CONFLICT, "Email already in use");
+        var u = users.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Пользователь", id));
+
+        if (!u.getUsername().equals(dto.getUsername()) && users.existsByUsername(dto.getUsername())) {
+            throw new ResourceAlreadyExistsException("Пользователь", "username", dto.getUsername());
+        }
+        if (!u.getEmail().equals(dto.getEmail()) && users.existsByEmail(dto.getEmail())) {
+            throw new ResourceAlreadyExistsException("Пользователь", "email", dto.getEmail());
+        }
+
         UserMapper.update(dto, u);
         return UserMapper.toDto(users.save(u));
     }
 
     @Override
     public void delete(Long id) {
-        if (!users.existsById(id)) throw new ResponseStatusException(HttpStatus.NOT_FOUND);
+        if (!users.existsById(id)) {
+            throw new ResourceNotFoundException("Пользователь", id);
+        }
         users.deleteById(id);
     }
 }

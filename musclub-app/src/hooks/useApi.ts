@@ -4,6 +4,21 @@ import { useState, useEffect } from 'react';
 import { apiClient } from '../lib/api';
 import { User, Event, Pageable } from '../types/api';
 
+function sortEventsByStartTimeDesc(events: Event[]): Event[] {
+  return [...events].sort((a, b) => {
+    const aTime = a.startTime ? new Date(a.startTime).getTime() : Number.NEGATIVE_INFINITY;
+    const bTime = b.startTime ? new Date(b.startTime).getTime() : Number.NEGATIVE_INFINITY;
+
+    // startTime DESC (nulls last)
+    if (!a.startTime && b.startTime) return 1;
+    if (a.startTime && !b.startTime) return -1;
+    if (aTime !== bTime) return bTime - aTime;
+
+    // fallback: id DESC for stable ordering
+    return (b.id ?? 0) - (a.id ?? 0);
+  });
+}
+
 // Хук для работы с пользователями
 export function useUsers(pageable?: Pageable) {
   const [users, setUsers] = useState<User[]>([]);
@@ -89,7 +104,7 @@ export function useEvents(pageable?: Pageable) {
       setLoading(true);
       setError(null);
       const response = await apiClient.getEvents(pageable);
-      setEvents(response.content);
+      setEvents(sortEventsByStartTimeDesc(response.content));
       setTotalElements(response.totalElements);
       setTotalPages(response.totalPages);
     } catch (err) {
@@ -112,7 +127,7 @@ export function useEvents(pageable?: Pageable) {
   }) => {
     try {
       const newEvent = await apiClient.createEvent(eventData);
-      setEvents(prev => [newEvent, ...prev]);
+      setEvents(prev => sortEventsByStartTimeDesc([newEvent, ...prev]));
       return newEvent;
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Ошибка создания события');
@@ -129,7 +144,7 @@ export function useEvents(pageable?: Pageable) {
   }>) => {
     try {
       const updatedEvent = await apiClient.updateEvent(id, eventData);
-      setEvents(prev => prev.map(event => event.id === id ? updatedEvent : event));
+      setEvents(prev => sortEventsByStartTimeDesc(prev.map(event => event.id === id ? updatedEvent : event)));
       return updatedEvent;
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Ошибка обновления события');

@@ -16,6 +16,21 @@ export default function Sidebar() {
 
     return (
         <>
+            {/* Полноэкранное затемнение при открытом сайдбаре (фиксированно на весь viewport) */}
+            {visible && (
+                <div
+                    role="presentation"
+                    aria-hidden
+                    onClick={() => setVisible(false)}
+                    style={{
+                        position: 'fixed',
+                        inset: 0,
+                        zIndex: 1400,
+                        backgroundColor: 'rgba(0, 0, 0, 0.5)',
+                    }}
+                />
+            )}
+
             {/* Кнопка-иконка меню */}
             <Button
                 view="flat"
@@ -33,8 +48,8 @@ export default function Sidebar() {
                 <Icon data={Bars} size={24} />
             </Button>
 
-            {/* Выдвижная панель */}
-            <Drawer onVeilClick={() => setVisible(false)}>
+            {/* Выдвижная панель: встроенное затемнение отключено, используется наше полноэкранное */}
+            <Drawer onVeilClick={() => setVisible(false)} hideVeil>
                 <DrawerItem
                     id="main-drawer"
                     visible={visible}

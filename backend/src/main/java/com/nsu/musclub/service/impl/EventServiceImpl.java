@@ -2,15 +2,17 @@ package com.nsu.musclub.service.impl;
 
 import com.nsu.musclub.domain.Event;
 import com.nsu.musclub.dto.event.*;
+import com.nsu.musclub.exception.BadRequestException;
+import com.nsu.musclub.exception.ResourceNotFoundException;
 import com.nsu.musclub.mapper.EventMapper;
 import com.nsu.musclub.repository.EventRepository;
 import com.nsu.musclub.service.EventService;
 import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
-import org.springframework.http.HttpStatus;
+import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import org.springframework.web.server.ResponseStatusException;
 
 import java.time.OffsetDateTime;
 
@@ -33,18 +35,30 @@ public class EventServiceImpl implements EventService {
     @Transactional(readOnly = true)
     public EventResponseDto get(Long id) {
         return events.findById(id).map(EventMapper::toDto)
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND));
+                .orElseThrow(() -> new ResourceNotFoundException("Мероприятие", id));
     }
 
     @Override
     @Transactional(readOnly = true)
     public Page<EventResponseDto> list(Pageable pageable) {
-        return events.findAll(pageable).map(EventMapper::toDto);
+        Pageable effectivePageable = pageable;
+        if (pageable.getSort().isUnsorted()) {
+            effectivePageable = PageRequest.of(
+                    pageable.getPageNumber(),
+                    pageable.getPageSize(),
+                    Sort.by(
+                            Sort.Order.desc("startTime").nullsLast(),
+                            Sort.Order.desc("id")
+                    )
+            );
+        }
+        return events.findAll(effectivePageable).map(EventMapper::toDto);
     }
 
     @Override
     public EventResponseDto update(Long id, EventUpdateDto dto) {
-        var event = events.findById(id).orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND));
+        var event = events.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Мероприятие", id));
         validateEventTimes(dto.getStartTime(), dto.getEndTime());
         EventMapper.update(dto, event);
         return EventMapper.toDto(events.save(event));
@@ -52,22 +66,15 @@ public class EventServiceImpl implements EventService {
 
     @Override
     public void delete(Long id) {
-        if (!events.existsById(id)) throw new ResponseStatusException(HttpStatus.NOT_FOUND);
+        if (!events.existsById(id)) {
+            throw new ResourceNotFoundException("Мероприятие", id);
+        }
         events.deleteById(id);
     }
 
     private void validateEventTimes(OffsetDateTime startTime, OffsetDateTime endTime) {
-        if (startTime != null && startTime.isBefore(OffsetDateTime.now())) {
-            throw new ResponseStatusException(
-                    HttpStatus.BAD_REQUEST,
-                    "Start time must be in the future"
-            );
-        }
         if (endTime != null && startTime != null && endTime.isBefore(startTime)) {
-            throw new ResponseStatusException(
-                    HttpStatus.BAD_REQUEST,
-                    "End time must be greater than or equal to start time"
-            );
+            throw new BadRequestException("Время окончания должно быть позже времени начала");
         }
     }
 }
