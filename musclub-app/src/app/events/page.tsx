@@ -151,8 +151,8 @@ export default function EventsPage() {
                 2xl:px-72
             "
         >
-            <div className="flex justify-between items-center">
-                <h1 className="text-3xl font-bold">Мероприятия</h1>
+            <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3 pl-12 sm:pl-0">
+                <h1 className="text-3xl font-bold leading-tight">Мероприятия</h1>
                 <Button
                     view="action"
                     onClick={handleCreateEvent}
