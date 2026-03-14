@@ -2,21 +2,21 @@
 
 import { useParams, useRouter } from 'next/navigation';
 import { Button, Icon, Text, Loader, Card, Select} from '@gravity-ui/uikit';
-import { Bookmark, HandPointRight, Clock, Persons, Pencil, Check, Xmark, Plus, TrashBin, Person, ArrowUp, ArrowDown, MusicNote } from '@gravity-ui/icons';
-import React, { useState, useEffect} from 'react';
-import { useEvents, useUsers } from '../../../hooks/useApi';
+import { Bookmark, HandPointRight, Clock, Pencil, Xmark, Plus, TrashBin, Person, ArrowUp, ArrowDown, MusicNote } from '@gravity-ui/icons';
+import React, { useState, useEffect, useCallback } from 'react';
+import { useEvents, useUsers } from '@/hooks/useApi';
 import { useSidebar } from '../../context/SidebarContext';
-import { apiClient } from '../../../lib/api';
-import { EventMember } from '../../../types/api';
+import { apiClient } from '@/lib/api';
+import { EventMember } from '@/types/api';
 
 interface TimelineEvent {
-    id: string;
+    id: number;
     time: string; // формат HH:mm
     description: string;
 }
 
 interface ProgramItem {
-    id: string;
+    id: number;
     title: string;
     artist?: string;
     time?: string; // формат HH:mm
@@ -43,15 +43,17 @@ export default function EventDetailsPage() {
 
     // Состояние для таймлайна
     const [timelineEvents, setTimelineEvents] = useState<TimelineEvent[]>([]);
+    const [timelineLoading, setTimelineLoading] = useState(false);
     const [showAddTimelineEvent, setShowAddTimelineEvent] = useState(false);
-    const [editingTimelineEventId, setEditingTimelineEventId] = useState<string | null>(null);
+    const [editingTimelineEventId, setEditingTimelineEventId] = useState<number | null>(null);
     const [newTimelineTime, setNewTimelineTime] = useState('09:00');
     const [newTimelineDescription, setNewTimelineDescription] = useState('');
     
     // Состояние для концертной программы
     const [programItems, setProgramItems] = useState<ProgramItem[]>([]);
+    const [programLoading, setProgramLoading] = useState(false);
     const [showAddProgramItem, setShowAddProgramItem] = useState(false);
-    const [editingProgramItemId, setEditingProgramItemId] = useState<string | null>(null);
+    const [editingProgramItemId, setEditingProgramItemId] = useState<number | null>(null);
     const [newProgramTitle, setNewProgramTitle] = useState('');
     const [newProgramArtist, setNewProgramArtist] = useState('');
     const [newProgramTime, setNewProgramTime] = useState('');
@@ -70,6 +72,59 @@ export default function EventDetailsPage() {
     const event = events.find((e) => e.id === Number(id));
 
     // Загрузка участников события
+    const normalizeTime = (time?: string) => {
+        if (!time) return '';
+        return time.slice(0, 5);
+    };
+
+    const loadTimeline = useCallback(async (eventId: number) => {
+        try {
+            setTimelineLoading(true);
+            const items = await apiClient.getEventTimeline(eventId);
+            setTimelineEvents(items.map((item) => ({
+                id: item.id,
+                time: normalizeTime(item.plannedTime),
+                description: item.description,
+            })));
+        } catch (err) {
+            console.error('Ошибка загрузки таймплана:', err);
+        } finally {
+            setTimelineLoading(false);
+        }
+    }, []);
+
+    const loadProgram = useCallback(async (eventId: number) => {
+        try {
+            setProgramLoading(true);
+            const items = await apiClient.getEventProgram(eventId);
+            setProgramItems(items.map((item) => ({
+                id: item.id,
+                title: item.title,
+                artist: item.artist,
+                time: normalizeTime(item.plannedTime),
+                duration: item.durationText,
+                notes: item.notes,
+            })));
+        } catch (err) {
+            console.error('Ошибка загрузки концертной программы:', err);
+        } finally {
+            setProgramLoading(false);
+        }
+    }, []);
+
+    const loadEventMembers = useCallback(async () => {
+        if (!event?.id) return;
+        try {
+            setMembersLoading(true);
+            const members = await apiClient.getEventMembers(event.id);
+            setEventMembers(members);
+        } catch (err) {
+            console.error('Ошибка загрузки участников:', err);
+        } finally {
+            setMembersLoading(false);
+        }
+    }, [event?.id]);
+
     useEffect(() => {
         // Сбрасываем состояние при переключении между мероприятиями
         setEventMembers([]);
@@ -81,24 +136,15 @@ export default function EventDetailsPage() {
         setAiDescriptionText('');
         setShowAiModal(false);
         setAiError(null);
-        
+        setTimelineEvents([]);
+        setProgramItems([]);
+
         if (event?.id) {
             loadEventMembers();
+            loadTimeline(event.id);
+            loadProgram(event.id);
         }
-    }, [event?.id]);
-
-    const loadEventMembers = async () => {
-        if (!event?.id) return;
-        try {
-            setMembersLoading(true);
-            const members = await apiClient.getEventMembers(event.id);
-            setEventMembers(members);
-        } catch (err) {
-            console.error('Ошибка загрузки участников:', err);
-        } finally {
-            setMembersLoading(false);
-        }
-    };
+    }, [event?.id, loadEventMembers, loadTimeline, loadProgram]);
 
     // Группировка участников по ролям
     const membersByRole = eventMembers.reduce((acc, member) => {
@@ -110,15 +156,13 @@ export default function EventDetailsPage() {
     }, {} as Record<string, EventMember[]>);
 
     // Объединяем роли из бекенда и созданные локально (но еще без участников)
-    const allRoleNames = [...new Set([...Object.keys(membersByRole), ...createdRoles])];
-    const roleNames = allRoleNames;
+    const roleNames = [...new Set([...Object.keys(membersByRole), ...createdRoles])];
 
     const toLocalInputFormat = (isoString: string) => {
         if (!isoString) return '';
         const date = new Date(isoString);
         const pad = (n: number) => String(n).padStart(2, '0');
-        const local = `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`;
-        return local;
+        return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`;
     };
 
     const [editData, setEditData] = useState({
@@ -266,7 +310,7 @@ export default function EventDetailsPage() {
         setShowAddTimelineEvent(true);
     };
 
-    const handleEditTimelineEvent = (eventId: string) => {
+    const handleEditTimelineEvent = (eventId: number) => {
         const event = timelineEvents.find(e => e.id === eventId);
         if (event) {
             setNewTimelineTime(event.time);
@@ -276,48 +320,38 @@ export default function EventDetailsPage() {
         }
     };
 
-    const handleSaveTimelineEvent = () => {
-        const timeString = newTimelineTime;
-        if (newTimelineDescription.trim()) {
+    const handleSaveTimelineEvent = async () => {
+        if (!event?.id || !newTimelineDescription.trim()) return;
+        try {
             if (editingTimelineEventId) {
-                // Обновляем существующее событие
-                setTimelineEvents(timelineEvents.map(e => 
-                    e.id === editingTimelineEventId 
-                        ? { ...e, time: timeString, description: newTimelineDescription.trim() }
-                        : e
-                ).sort((a, b) => {
-                    const [aHours, aMinutes] = a.time.split(':').map(Number);
-                    const [bHours, bMinutes] = b.time.split(':').map(Number);
-                    const aTotal = aHours * 60 + aMinutes;
-                    const bTotal = bHours * 60 + bMinutes;
-                    return aTotal - bTotal;
-                }));
-            } else {
-                // Добавляем новое событие
-                const newEvent: TimelineEvent = {
-                    id: Date.now().toString(),
-                    time: timeString,
-                    description: newTimelineDescription.trim()
-                };
-                // Сортируем по времени при добавлении
-                const sorted = [...timelineEvents, newEvent].sort((a, b) => {
-                    const [aHours, aMinutes] = a.time.split(':').map(Number);
-                    const [bHours, bMinutes] = b.time.split(':').map(Number);
-                    const aTotal = aHours * 60 + aMinutes;
-                    const bTotal = bHours * 60 + bMinutes;
-                    return aTotal - bTotal;
+                await apiClient.updateEventTimelineItem(event.id, editingTimelineEventId, {
+                    plannedTime: newTimelineTime,
+                    description: newTimelineDescription.trim(),
                 });
-                setTimelineEvents(sorted);
+            } else {
+                await apiClient.createEventTimelineItem(event.id, {
+                    plannedTime: newTimelineTime,
+                    description: newTimelineDescription.trim(),
+                });
             }
+            await loadTimeline(event.id);
             setNewTimelineTime('09:00');
             setNewTimelineDescription('');
             setEditingTimelineEventId(null);
             setShowAddTimelineEvent(false);
+        } catch (err) {
+            console.error('Ошибка сохранения элемента таймплана:', err);
         }
     };
 
-    const handleDeleteTimelineEvent = (eventId: string) => {
-        setTimelineEvents(timelineEvents.filter(e => e.id !== eventId));
+    const handleDeleteTimelineEvent = async (timelineEventId: number) => {
+        if (!event?.id) return;
+        try {
+            await apiClient.deleteEventTimelineItem(event.id, timelineEventId);
+            await loadTimeline(event.id);
+        } catch (err) {
+            console.error('Ошибка удаления элемента таймплана:', err);
+        }
     };
 
     // Функции для работы с концертной программой
@@ -331,7 +365,7 @@ export default function EventDetailsPage() {
         setShowAddProgramItem(true);
     };
 
-    const handleEditProgramItem = (itemId: string) => {
+    const handleEditProgramItem = (itemId: number) => {
         const item = programItems.find(i => i.id === itemId);
         if (item) {
             setNewProgramTitle(item.title);
@@ -344,34 +378,24 @@ export default function EventDetailsPage() {
         }
     };
 
-    const handleSaveProgramItem = () => {
-        if (newProgramTitle.trim()) {
+    const handleSaveProgramItem = async () => {
+        if (!event?.id || !newProgramTitle.trim()) return;
+        try {
+            const payload = {
+                title: newProgramTitle.trim(),
+                artist: newProgramArtist.trim() || undefined,
+                plannedTime: newProgramTime.trim() || undefined,
+                durationText: newProgramDuration.trim() || undefined,
+                notes: newProgramNotes.trim() || undefined,
+            };
+
             if (editingProgramItemId) {
-                // Обновляем существующий элемент
-                setProgramItems(programItems.map(item => 
-                    item.id === editingProgramItemId 
-                        ? { 
-                            ...item, 
-                            title: newProgramTitle.trim(),
-                            artist: newProgramArtist.trim() || undefined,
-                            time: newProgramTime.trim() || undefined,
-                            duration: newProgramDuration.trim() || undefined,
-                            notes: newProgramNotes.trim() || undefined
-                        }
-                        : item
-                ));
+                await apiClient.updateEventProgramItem(event.id, editingProgramItemId, payload);
             } else {
-                // Добавляем новый элемент
-                const newItem: ProgramItem = {
-                    id: Date.now().toString(),
-                    title: newProgramTitle.trim(),
-                    artist: newProgramArtist.trim() || undefined,
-                    time: newProgramTime.trim() || undefined,
-                    duration: newProgramDuration.trim() || undefined,
-                    notes: newProgramNotes.trim() || undefined
-                };
-                setProgramItems([...programItems, newItem]);
+                await apiClient.createEventProgramItem(event.id, payload);
             }
+
+            await loadProgram(event.id);
             setNewProgramTitle('');
             setNewProgramArtist('');
             setNewProgramTime('');
@@ -379,14 +403,23 @@ export default function EventDetailsPage() {
             setNewProgramNotes('');
             setEditingProgramItemId(null);
             setShowAddProgramItem(false);
+        } catch (err) {
+            console.error('Ошибка сохранения элемента программы:', err);
         }
     };
 
-    const handleDeleteProgramItem = (itemId: string) => {
-        setProgramItems(programItems.filter(item => item.id !== itemId));
+    const handleDeleteProgramItem = async (itemId: number) => {
+        if (!event?.id) return;
+        try {
+            await apiClient.deleteEventProgramItem(event.id, itemId);
+            await loadProgram(event.id);
+        } catch (err) {
+            console.error('Ошибка удаления элемента программы:', err);
+        }
     };
 
-    const handleMoveProgramItem = (itemId: string, direction: 'up' | 'down') => {
+    const handleMoveProgramItem = async (itemId: number, direction: 'up' | 'down') => {
+        if (!event?.id) return;
         const index = programItems.findIndex(item => item.id === itemId);
         if (index === -1) return;
         
@@ -395,7 +428,19 @@ export default function EventDetailsPage() {
         
         const newItems = [...programItems];
         [newItems[index], newItems[newIndex]] = [newItems[newIndex], newItems[index]];
-        setProgramItems(newItems);
+        try {
+            const reordered = await apiClient.reorderEventProgram(event.id, newItems.map((item) => item.id));
+            setProgramItems(reordered.map((item) => ({
+                id: item.id,
+                title: item.title,
+                artist: item.artist,
+                time: normalizeTime(item.plannedTime),
+                duration: item.durationText,
+                notes: item.notes,
+            })));
+        } catch (err) {
+            console.error('Ошибка изменения порядка программы:', err);
+        }
     };
 
     const tabsItems = [
@@ -568,7 +613,7 @@ export default function EventDetailsPage() {
                                             placeholder="Название роли (например: Режиссер)"
                                             value={newRoleName}
                                             onChange={(e) => setNewRoleName(e.target.value)}
-                                            onKeyPress={(e) => {
+                                            onKeyDown={(e) => {
                                                 if (e.key === 'Enter' && newRoleName.trim()) {
                                                     handleCreateRole();
                                                 }
@@ -661,7 +706,7 @@ export default function EventDetailsPage() {
                                                 <div className="flex flex-col gap-3 mb-4 p-3 bg-[--g-color-base-generic-hover] rounded-lg">
                                                     {isNewRole && (
                                                         <Text variant="body-2" color="secondary" className="mb-1">
-                                                            Шаг 2: Назначьте участника на роль "{roleName}"
+                                                            Шаг 2: Назначьте участника на роль &quot;{roleName}&quot;
                                                         </Text>
                                                     )}
                                                     <div className="flex flex-col sm:flex-row gap-2">
@@ -788,7 +833,7 @@ export default function EventDetailsPage() {
                                             placeholder="Введите описание события..."
                                             value={newTimelineDescription}
                                             onChange={(e) => setNewTimelineDescription(e.target.value)}
-                                            onKeyPress={(e) => e.key === 'Enter' && handleSaveTimelineEvent()}
+                                            onKeyDown={(e) => e.key === 'Enter' && handleSaveTimelineEvent()}
                                             className="flex-1 px-3 sm:px-4 py-2 sm:py-3 border-2 border-[--foreground]/20 rounded-xl bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all text-sm sm:text-base"
                                             autoFocus
                                             required
@@ -818,7 +863,12 @@ export default function EventDetailsPage() {
                             </Card>
                         )}
 
-                        {timelineEvents.length === 0 ? (
+                        {timelineLoading ? (
+                            <Card className="p-8 text-center">
+                                <Loader size="m" />
+                                <Text color="secondary" className="mt-2">Загрузка таймплана...</Text>
+                            </Card>
+                        ) : timelineEvents.length === 0 ? (
                             <Card className="p-12 text-center border-2 border-dashed border-[--g-color-line-generic]">
                                 <div className="flex flex-col items-center gap-4">
                                     <div className="w-16 h-16 rounded-full bg-blue-100 dark:bg-blue-900/30 flex items-center justify-center">
@@ -1003,7 +1053,12 @@ export default function EventDetailsPage() {
                             </Card>
                         )}
 
-                        {programItems.length === 0 ? (
+                        {programLoading ? (
+                            <Card className="p-8 text-center">
+                                <Loader size="m" />
+                                <Text color="secondary" className="mt-2">Загрузка концертной программы...</Text>
+                            </Card>
+                        ) : programItems.length === 0 ? (
                             <Card className="p-8 sm:p-12 text-center border-2 border-dashed border-[--g-color-line-generic]">
                                 <div className="flex flex-col items-center gap-4">
                                     <div className="w-12 h-12 sm:w-16 sm:h-16 rounded-full bg-purple-100 dark:bg-purple-900/30 flex items-center justify-center">
@@ -1132,11 +1187,11 @@ export default function EventDetailsPage() {
                             size="l"
                             onClick={() => {
                                 setEditData({
-                                    title: event.title || '',
-                                    description: event.description || '',
-                                    startTime: toLocalInputFormat(event.startTime || ''),
-                                    endTime: toLocalInputFormat(event.endTime || ''),
-                                    venue: event.venue || ''
+                                    title: event?.title || '',
+                                    description: event?.description || '',
+                                    startTime: toLocalInputFormat(event?.startTime || ''),
+                                    endTime: toLocalInputFormat(event?.endTime || ''),
+                                    venue: event?.venue || ''
                                 });
                                 setIsEditing(true);
                             }}

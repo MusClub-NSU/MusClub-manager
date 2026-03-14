@@ -3,10 +3,11 @@
 import { useEffect, useState } from 'react';
 import { useRouter, useParams } from 'next/navigation';
 import { Card, Button, Text, Icon, Loader, Select} from '@gravity-ui/uikit';
-import { Person, LogoTelegram, Calendar, Tags, Pencil } from '@gravity-ui/icons';
-import { useUsers } from '../../../hooks/useApi';
+import { Person, LogoTelegram, Calendar, Tags, Pencil, TrashBin } from '@gravity-ui/icons';
+import { useUsers } from '@/hooks/useApi';
 import { useSidebar } from '../../context/SidebarContext';
 import { PushNotificationSettings } from '../../components/PushNotificationSettings';
+import { apiClient } from '@/lib/api';
 
 export default function UserDetailsPage() {
     const params = useParams();
@@ -15,7 +16,7 @@ export default function UserDetailsPage() {
 
     const userId = Number(params.id);
 
-    const { users, loading, error, updateUser} = useUsers({ page: 0, size: 999 });
+    const { users, loading, error, updateUser, refetch } = useUsers({ page: 0, size: 999 });
     const user = users.find((u) => u.id === userId);
 
     const [isEditing, setIsEditing] = useState(false);
@@ -60,11 +61,27 @@ export default function UserDetailsPage() {
         setIsEditing(false);
     };
 
-    const handleAvatarChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const handleAvatarChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
         const file = e.target.files?.[0];
         if (!file) return;
         const preview = URL.createObjectURL(file);
         setAvatarPreview(preview);
+        try {
+            await apiClient.uploadUserAvatar(user.id, file);
+            await refetch();
+        } catch (err) {
+            console.error('Ошибка загрузки аватара:', err);
+        }
+    };
+
+    const handleDeleteAvatar = async () => {
+        try {
+            await apiClient.deleteUserAvatar(user.id);
+            setAvatarPreview(null);
+            await refetch();
+        } catch (err) {
+            console.error('Ошибка удаления аватара:', err);
+        }
     };
 
     return (
@@ -107,9 +124,9 @@ export default function UserDetailsPage() {
 
                         {/* Аватар */}
                         <div className="relative w-32 h-32">
-                            {avatarPreview ? (
+                            {(avatarPreview || user.avatarUrl) ? (
                                 <img
-                                    src={avatarPreview}
+                                    src={avatarPreview || user.avatarUrl}
                                     alt="avatar"
                                     className="w-32 h-32 rounded-full object-cover border"
                                 />
@@ -139,6 +156,18 @@ export default function UserDetailsPage() {
                                             <Icon data={Pencil} size={16}/>
                                         </Button>
                                     </div>
+                                    {(avatarPreview || user.avatarUrl) && (
+                                        <div className="absolute bottom-[-6px] right-[-6px] z-10">
+                                            <Button
+                                                view="flat"
+                                                size="s"
+                                                pin="round-round"
+                                                onClick={handleDeleteAvatar}
+                                            >
+                                                <Icon data={TrashBin} size={14}/>
+                                            </Button>
+                                        </div>
+                                    )}
                                 </>
                             )}
                         </div>
@@ -155,14 +184,14 @@ export default function UserDetailsPage() {
                                 />
                             ) : (
                                 <button
-                                    onClick={() => navigator.clipboard.writeText(user.email)}
+                                    onClick={() => navigator.clipboard.writeText(user?.email ?? '')}
                                     className="
                 break-words text-lg sm:text-xl font-medium text-left
                 hover:text-[--g-color-text-link] transition
                 cursor-pointer
             "
                                 >
-                                    {user.email}
+                                    {user?.email ?? ''}
                                 </button>
                             )}
                         </div>
