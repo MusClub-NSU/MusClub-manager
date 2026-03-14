@@ -2,6 +2,7 @@ package com.nsu.musclub.service.impl;
 
 import com.nsu.musclub.domain.User;
 import com.nsu.musclub.dto.user.*;
+import com.nsu.musclub.exception.BadRequestException;
 import com.nsu.musclub.exception.ResourceAlreadyExistsException;
 import com.nsu.musclub.exception.ResourceNotFoundException;
 import com.nsu.musclub.mapper.UserMapper;
@@ -11,10 +12,15 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.multipart.MultipartFile;
+
+import java.io.IOException;
 
 @Service
 @Transactional
 public class UserServiceImpl implements UserService {
+    private static final long MAX_AVATAR_SIZE_BYTES = 5 * 1024 * 1024;
+
     private final UserRepository users;
 
     public UserServiceImpl(UserRepository users) {
@@ -59,6 +65,62 @@ public class UserServiceImpl implements UserService {
 
         UserMapper.update(dto, u);
         return UserMapper.toDto(users.save(u));
+    }
+
+    @Override
+    public UserResponseDto uploadAvatar(Long id, MultipartFile file) {
+        if (file == null || file.isEmpty()) {
+            throw new BadRequestException("Файл аватара пустой", "EMPTY_AVATAR_FILE");
+        }
+        if (file.getSize() > MAX_AVATAR_SIZE_BYTES) {
+            throw new BadRequestException("Размер аватара превышает 5MB", "AVATAR_TOO_LARGE");
+        }
+
+        String contentType = file.getContentType();
+        if (contentType == null || !contentType.startsWith("image/")) {
+            throw new BadRequestException("Поддерживаются только изображения", "INVALID_AVATAR_CONTENT_TYPE");
+        }
+
+        User user = users.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Пользователь", id));
+
+        try {
+            user.setAvatarData(file.getBytes());
+        } catch (IOException e) {
+            throw new BadRequestException("Не удалось прочитать файл аватара", "AVATAR_READ_ERROR");
+        }
+        user.setAvatarContentType(contentType);
+        user.setAvatarFileName(file.getOriginalFilename());
+
+        return UserMapper.toDto(users.save(user));
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public UserAvatarDto getAvatar(Long id) {
+        User user = users.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Пользователь", id));
+
+        if (user.getAvatarData() == null || user.getAvatarData().length == 0) {
+            throw new ResourceNotFoundException("Аватар пользователя", id);
+        }
+
+        UserAvatarDto dto = new UserAvatarDto();
+        dto.setData(user.getAvatarData());
+        dto.setContentType(user.getAvatarContentType());
+        dto.setFileName(user.getAvatarFileName());
+        return dto;
+    }
+
+    @Override
+    public void deleteAvatar(Long id) {
+        User user = users.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Пользователь", id));
+
+        user.setAvatarData(null);
+        user.setAvatarContentType(null);
+        user.setAvatarFileName(null);
+        users.save(user);
     }
 
     @Override
