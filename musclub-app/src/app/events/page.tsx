@@ -159,7 +159,7 @@ export default function EventsPage() {
                     disabled={isCreating || visible}
                 >
                     <span className="flex items-center justify-center gap-2">
-                        <Plus size={16} />
+                        <Icon data={Plus} size={16} />
                         <span>Добавить мероприятие</span>
                     </span>
                 </Button>
@@ -221,7 +221,7 @@ export default function EventsPage() {
                                         onClick={() => handleEditEvent(event)}
                                         disabled={visible}
                                     >
-                                        <Pencil size={14} />
+                                        <Icon data={Pencil} size={14} />
                                     </Button>
                                     <Button
                                         view="flat"
@@ -229,7 +229,7 @@ export default function EventsPage() {
                                         onClick={() => handleDeleteEvent(event.id)}
                                         disabled={visible}
                                     >
-                                        <TrashBin size={14} />
+                                        <Icon data={TrashBin} size={14} />
                                     </Button>
                                 </div>
                             </div>

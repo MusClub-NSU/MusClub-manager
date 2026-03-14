@@ -661,7 +661,7 @@ export default function EventDetailsPage() {
                                                 <div className="flex flex-col gap-3 mb-4 p-3 bg-[--g-color-base-generic-hover] rounded-lg">
                                                     {isNewRole && (
                                                         <Text variant="body-2" color="secondary" className="mb-1">
-                                                            Шаг 2: Назначьте участника на роль "{roleName}"
+                                                            Шаг 2: Назначьте участника на роль &quot;{roleName}&quot;
                                                         </Text>
                                                     )}
                                                     <div className="flex flex-col sm:flex-row gap-2">

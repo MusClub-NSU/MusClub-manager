@@ -4,6 +4,8 @@ import GravityProvider from "./GravityProvider";
 import Sidebar from "./components/Sidebar";
 import { SidebarProvider } from './context/SidebarContext';
 import { PushNotificationInit } from './components/PushNotificationInit';
+import AuthProvider from './components/AuthProvider';
+import AuthGuard from './components/AuthGuard';
 
 import '@gravity-ui/uikit/styles/fonts.css';
 import '@gravity-ui/uikit/styles/styles.css';
@@ -23,13 +25,17 @@ export default function RootLayout({
   return (
     <html lang="ru">
       <body className="antialiased">
-      <SidebarProvider>
-        <GravityProvider>
-            <PushNotificationInit />
-            <Sidebar />
-            {children}
-        </GravityProvider>
-      </SidebarProvider>
+      <AuthProvider>
+        <SidebarProvider>
+          <GravityProvider>
+            <AuthGuard>
+              <PushNotificationInit />
+              <Sidebar />
+              {children}
+            </AuthGuard>
+          </GravityProvider>
+        </SidebarProvider>
+      </AuthProvider>
       </body>
     </html>
   );

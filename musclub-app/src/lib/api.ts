@@ -1,7 +1,7 @@
 import { User, UserCreateDto, UserUpdateDto, Event, EventCreateDto, EventUpdateDto, Page, Pageable, EventMember, EventMemberUpsertDto, PosterDescriptionResponse } from '../types/api';
+import { getSession } from 'next-auth/react';
 
 // По умолчанию ходим на "/api" (Next.js proxy -> backend через rewrites в next.config.ts).
-// Можно переопределить в рантайме, установив window.ENV_API_URL (например, "https://my-backend.example.com").
 const API_BASE_URL =
   typeof window !== 'undefined'
     ? (window as unknown as { ENV_API_URL?: string }).ENV_API_URL || '/api'
@@ -10,9 +10,18 @@ const API_BASE_URL =
 class ApiClient {
   private async request<T>(endpoint: string, options: RequestInit = {}): Promise<T> {
     const url = `${API_BASE_URL}${endpoint}`;
+
+    // Получаем access token из сессии NextAuth и добавляем в заголовок
+    const session = await getSession();
+    const authHeaders: Record<string, string> = {};
+    if (session?.accessToken) {
+      authHeaders['Authorization'] = `Bearer ${session.accessToken}`;
+    }
+
     const response = await fetch(url, {
       headers: {
         'Content-Type': 'application/json',
+        ...authHeaders,
         ...options.headers,
       },
       ...options,
