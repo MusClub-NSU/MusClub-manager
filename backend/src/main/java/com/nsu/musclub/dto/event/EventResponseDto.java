@@ -1,5 +1,6 @@
 package com.nsu.musclub.dto.event;
 
+import com.nsu.musclub.domain.EventStatus;
 import java.time.OffsetDateTime;
 
 public class EventResponseDto {
@@ -11,6 +12,7 @@ public class EventResponseDto {
     private String venue;
     private OffsetDateTime createdAt;
     private String aiDescription;
+    private EventStatus status;
 
     public Long getId() {
         return id;
@@ -74,5 +76,13 @@ public class EventResponseDto {
 
     public void setAiDescription(String aiDescription) {
         this.aiDescription = aiDescription;
+    }
+
+    public EventStatus getStatus() {
+        return status;
+    }
+
+    public void setStatus(EventStatus status) {
+        this.status = status;
     }
 }

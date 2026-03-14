@@ -32,12 +32,24 @@ public class Event {
     @Column(name = "ai_description", columnDefinition = "TEXT")
     private String aiDescription;
 
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false, length = 32)
+    private EventStatus status = EventStatus.NOT_STARTED;
+
     public String getAiDescription() {
         return aiDescription;
     }
 
     public void setAiDescription(String aiDescription) {
         this.aiDescription = aiDescription;
+    }
+
+    public EventStatus getStatus() {
+        return status;
+    }
+
+    public void setStatus(EventStatus status) {
+        this.status = status;
     }
 
     public Long getId() {

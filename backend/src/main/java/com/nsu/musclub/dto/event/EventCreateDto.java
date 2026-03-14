@@ -1,6 +1,8 @@
 package com.nsu.musclub.dto.event;
 
+import com.nsu.musclub.domain.EventStatus;
 import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
 
 import java.time.OffsetDateTime;
@@ -13,11 +15,14 @@ public class EventCreateDto {
     @Size(max = 1000)
     private String description;
 
+    @NotNull
     private OffsetDateTime startTime;
     private OffsetDateTime endTime;
 
     @Size(max = 255)
     private String venue;
+
+    private EventStatus status;
 
     public String getTitle() {
         return title;
@@ -57,5 +62,13 @@ public class EventCreateDto {
 
     public void setVenue(String venue) {
         this.venue = venue;
+    }
+
+    public EventStatus getStatus() {
+        return status;
+    }
+
+    public void setStatus(EventStatus status) {
+        this.status = status;
     }
 }
