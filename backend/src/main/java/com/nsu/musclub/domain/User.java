@@ -25,7 +25,7 @@ public class User {
 
     @Lob
     @Basic(fetch = FetchType.LAZY)
-    @Column(name = "avatar_data")
+    @Column(name = "avatar_data", columnDefinition = "BYTEA")
     private byte[] avatarData;
 
     @Column(name = "avatar_content_type", length = 100)

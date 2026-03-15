@@ -14,6 +14,12 @@ const nextConfig: NextConfig = {
     async rewrites() {
         return [
             {
+                // Маршруты NextAuth обрабатываются самим Next.js, не проксируем их на backend
+                source: "/api/auth/:path*",
+                destination: "/api/auth/:path*",
+            },
+            {
+                // Остальной backend уходит на Spring Boot
                 source: "/api/:path*",
                 destination: "http://localhost:8080/api/:path*",
             },
