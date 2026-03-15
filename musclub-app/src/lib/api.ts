@@ -1,3 +1,4 @@
+import { getSession } from 'next-auth/react';
 import {
   User,
   UserCreateDto,

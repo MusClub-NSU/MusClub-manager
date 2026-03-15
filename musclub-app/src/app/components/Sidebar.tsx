@@ -1,8 +1,8 @@
 'use client';
 
 import { Drawer, DrawerItem } from '@gravity-ui/navigation';
-import { Button, Icon } from '@gravity-ui/uikit';
-import { Bars, Persons, Calendar, House } from '@gravity-ui/icons';
+import { Button, Icon, Text } from '@gravity-ui/uikit';
+import { Bars, Persons, Calendar, House, ArrowRightFromSquare } from '@gravity-ui/icons';
 import Link from 'next/link';
 import '@gravity-ui/uikit/styles/styles.css';
 import { useSidebar } from '../context/SidebarContext';
