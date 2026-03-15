@@ -2,14 +2,12 @@ package com.nsu.musclub;
 
 import com.nsu.musclub.container.PostgresSingletonContainer;
 import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.security.test.context.support.WithMockUser;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
 import org.testcontainers.junit.jupiter.Testcontainers;
 
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
 @Testcontainers
-@WithMockUser
 public abstract class AbstractIntegrationTest {
 
     private static final PostgresSingletonContainer POSTGRES = PostgresSingletonContainer.getInstance();

@@ -3,12 +3,6 @@ spring:
     url: ${SPRING_DATASOURCE_URL:jdbc:postgresql://localhost:5433/musclub}
     username: ${SPRING_DATASOURCE_USERNAME:musclub}
     password: ${SPRING_DATASOURCE_PASSWORD:musclub}
-  security:
-    oauth2:
-      resourceserver:
-        jwt:
-          # Keycloak issuer URI: http://<host>/realms/<realm-name>
-          issuer-uri: ${KEYCLOAK_ISSUER_URI:http://localhost:8180/realms/musclub}
   jpa:
     hibernate:
       ddl-auto: validate

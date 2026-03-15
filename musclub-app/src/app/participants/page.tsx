@@ -127,7 +127,7 @@ export default function ParticipantsPage() {
                         disabled={isCreating || sidebarVisible}
                     >
                         <span className="flex items-center justify-center gap-2">
-                        <Icon data={Plus} size={16} />
+                        <Plus size={16} />
                             <span>Добавить участника</span>
                         </span>
                     </Button>
@@ -186,7 +186,7 @@ export default function ParticipantsPage() {
                                                     onClick={() => handleEditUser(user)}
                                                     disabled={sidebarVisible}
                                                 >
-                                                    <Icon data={Pencil} size={14} />
+                                                    <Pencil size={14} />
                                                 </Button>
                                                 <Button
                                                     view="flat"
@@ -194,7 +194,7 @@ export default function ParticipantsPage() {
                                                     onClick={() => handleDeleteUser(user.id)}
                                                     disabled={sidebarVisible}
                                                 >
-                                                    <Icon data={TrashBin} size={14} />
+                                                    <TrashBin size={14} />
                                                 </Button>
                                             </div>
                                         </td>

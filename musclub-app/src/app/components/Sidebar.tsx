@@ -6,11 +6,9 @@ import { Bars, Persons, Calendar, House } from '@gravity-ui/icons';
 import Link from 'next/link';
 import '@gravity-ui/uikit/styles/styles.css';
 import { useSidebar } from '../context/SidebarContext';
-import { useSession, signOut } from 'next-auth/react';
 
 export default function Sidebar() {
     const { visible, setVisible, disabled } = useSidebar();
-    const { data: session } = useSession();
 
     const toggleDrawer = () => {
         if (!disabled) setVisible(!visible);
@@ -18,6 +16,7 @@ export default function Sidebar() {
 
     return (
         <>
+            {/* Полноэкранное затемнение при открытом сайдбаре (фиксированно на весь viewport) */}
             {visible && (
                 <div
                     role="presentation"
@@ -32,6 +31,7 @@ export default function Sidebar() {
                 />
             )}
 
+            {/* Кнопка-иконка меню */}
             <Button
                 view="flat"
                 onClick={toggleDrawer}
@@ -48,6 +48,7 @@ export default function Sidebar() {
                 <Icon data={Bars} size={24} />
             </Button>
 
+            {/* Выдвижная панель: встроенное затемнение отключено, используется наше полноэкранное */}
             <Drawer onVeilClick={() => setVisible(false)} hideVeil>
                 <DrawerItem
                     id="main-drawer"
@@ -68,22 +69,9 @@ export default function Sidebar() {
                             height: '100%',
                         }}
                     >
-                        <h2 style={{ marginBottom: '8px' }}>MusClub</h2>
+                        <h2 style={{ marginBottom: '16px' }}></h2>
 
-                        {/* Информация о пользователе */}
-                        {session?.user && (
-                            <div style={{
-                                padding: '12px',
-                                borderRadius: '8px',
-                                background: 'rgba(0,0,0,0.05)',
-                                marginBottom: '8px',
-                            }}>
-                                <Text variant="subheader-2">{session.user.name}</Text>
-                                <br />
-                                <Text color="secondary" variant="caption-2">{session.user.email}</Text>
-                            </div>
-                        )}
-
+                        {/* Навигационные ссылки */}
                         <nav
                             style={{
                                 display: 'flex',
@@ -146,18 +134,8 @@ export default function Sidebar() {
                             </Link>
                         </nav>
 
-                        <div style={{ marginTop: 'auto', display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                            <Button
-                                view="outlined-danger"
-                                width="max"
-                                onClick={() => signOut({ callbackUrl: '/' })}
-                            >
-                                <Icon data={ArrowRightFromSquare} size={16} />
-                                Выйти
-                            </Button>
-                            <Text variant="caption-2" color="secondary" style={{ textAlign: 'center' }}>
-                                © MusClub App
-                            </Text>
+                        <div style={{ marginTop: 'auto', fontSize: '14px', color: '#777' }}>
+                            © MusClub App
                         </div>
                     </div>
                 </DrawerItem>
