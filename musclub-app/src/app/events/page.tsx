@@ -151,15 +151,15 @@ export default function EventsPage() {
                 2xl:px-72
             "
         >
-            <div className="flex justify-between items-center">
-                <h1 className="text-3xl font-bold">Мероприятия</h1>
+            <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3 pl-12 sm:pl-0">
+                <h1 className="text-3xl font-bold leading-tight">Мероприятия</h1>
                 <Button
                     view="action"
                     onClick={handleCreateEvent}
                     disabled={isCreating || visible}
                 >
                     <span className="flex items-center justify-center gap-2">
-                        <Plus size={16} />
+                        <Icon data={Plus} size={16} />
                         <span>Добавить мероприятие</span>
                     </span>
                 </Button>
@@ -221,7 +221,7 @@ export default function EventsPage() {
                                         onClick={() => handleEditEvent(event)}
                                         disabled={visible}
                                     >
-                                        <Pencil size={14} />
+                                        <Icon data={Pencil} size={14} />
                                     </Button>
                                     <Button
                                         view="flat"
@@ -229,7 +229,7 @@ export default function EventsPage() {
                                         onClick={() => handleDeleteEvent(event.id)}
                                         disabled={visible}
                                     >
-                                        <TrashBin size={14} />
+                                        <Icon data={TrashBin} size={14} />
                                     </Button>
                                 </div>
                             </div>

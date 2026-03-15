@@ -1,7 +1,13 @@
 // Мутатор для Orval - кастомная логика для HTTP запросов
-import { apiClient } from './api';
 
-export const customInstance = async <T>(config: any): Promise<T> => {
+interface RequestConfig {
+  url: string;
+  method: string;
+  data?: unknown;
+  params?: Record<string, unknown>;
+}
+
+export const customInstance = async <T>(config: RequestConfig): Promise<T> => {
   const { url, method, data, params } = config;
   
   try {

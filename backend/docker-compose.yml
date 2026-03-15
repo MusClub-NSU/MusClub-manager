@@ -16,6 +16,33 @@ services:
       timeout: 5s
       retries: 10
 
+  keycloak:
+    image: quay.io/keycloak/keycloak:24.0
+    container_name: musclub_keycloak
+    command: start-dev --import-realm
+    environment:
+      KEYCLOAK_ADMIN: admin
+      KEYCLOAK_ADMIN_PASSWORD: admin
+      KC_DB: postgres
+      KC_DB_URL: jdbc:postgresql://db:5432/musclub
+      KC_DB_USERNAME: musclub
+      KC_DB_PASSWORD: musclub
+      KC_HTTP_PORT: 8180
+      KC_HOSTNAME_STRICT: "false"
+      KC_HOSTNAME_STRICT_HTTPS: "false"
+    ports:
+      - "8180:8180"
+    volumes:
+      - ./keycloak:/opt/keycloak/data/import
+    depends_on:
+      db:
+        condition: service_healthy
+    healthcheck:
+      test: [ "CMD-SHELL", "curl -f http://localhost:8180/realms/master || exit 1" ]
+      interval: 10s
+      timeout: 5s
+      retries: 15
+
   app:
     build:
       context: .
@@ -25,12 +52,15 @@ services:
       SPRING_DATASOURCE_URL: jdbc:postgresql://db:5432/musclub
       SPRING_DATASOURCE_USERNAME: musclub
       SPRING_DATASOURCE_PASSWORD: musclub
+      KEYCLOAK_ISSUER_URI: http://keycloak:8180/realms/musclub
       VAPID_PUBLIC_KEY: BLrkc-3gcvpo4V6OkpBm1X9qsQ_O8qYVERu8F6ybBKX_FAmFooYJ-Dj-1oS7BT9W4bLKLOYESYc-hQiSHAphYjE
       VAPID_PRIVATE_KEY: HWOmlHHey5cQt0d6vNbS-X-gF4jb1h28mr8sAq7d1FY
     ports:
       - "8080:8080"
     depends_on:
       db:
+        condition: service_healthy
+      keycloak:
         condition: service_healthy
     volumes:
       - ./src:/app/src

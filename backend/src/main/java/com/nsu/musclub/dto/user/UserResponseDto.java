@@ -8,6 +8,7 @@ public class UserResponseDto {
     private String email;
     private String role;
     private OffsetDateTime createdAt;
+    private String avatarUrl;
 
     public Long getId() {
         return id;
@@ -47,5 +48,13 @@ public class UserResponseDto {
 
     public void setCreatedAt(OffsetDateTime createdAt) {
         this.createdAt = createdAt;
+    }
+
+    public String getAvatarUrl() {
+        return avatarUrl;
+    }
+
+    public void setAvatarUrl(String avatarUrl) {
+        this.avatarUrl = avatarUrl;
     }
 }
