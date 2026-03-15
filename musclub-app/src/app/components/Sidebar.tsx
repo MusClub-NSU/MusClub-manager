@@ -1,8 +1,8 @@
 'use client';
 
 import { Drawer, DrawerItem } from '@gravity-ui/navigation';
-import { Button, Icon, Text } from '@gravity-ui/uikit';
-import { Bars, Persons, Calendar, ArrowRightFromSquare } from '@gravity-ui/icons';
+import { Button, Icon } from '@gravity-ui/uikit';
+import { Bars, Persons, Calendar, House } from '@gravity-ui/icons';
 import Link from 'next/link';
 import '@gravity-ui/uikit/styles/styles.css';
 import { useSidebar } from '../context/SidebarContext';
@@ -91,6 +91,24 @@ export default function Sidebar() {
                                 gap: '12px',
                             }}
                         >
+                            <Link
+                                href="/"
+                                onClick={() => setVisible(false)}
+                                style={{
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    gap: '10px',
+                                    textDecoration: 'none',
+                                    fontSize: '18px',
+                                    padding: '8px 12px',
+                                    borderRadius: '8px',
+                                    transition: 'background 0.2s',
+                                }}
+                            >
+                                <Icon data={House} size={20} />
+                                Главная
+                            </Link>
+
                             <Link
                                 href="/participants"
                                 onClick={() => setVisible(false)}

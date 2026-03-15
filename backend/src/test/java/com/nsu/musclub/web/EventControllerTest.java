@@ -632,6 +632,102 @@ class EventControllerTest extends AbstractIntegrationTest {
                 .andExpect(jsonPath("$.id").value(eventId));
     }
 
+    @Test
+    void timelineCrudAndReorder_ShouldWork() throws Exception {
+        String eventResponse = mockMvc.perform(post("/api/events")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(createEventDto("Timeline Event"))))
+                .andExpect(status().isCreated())
+                .andReturn()
+                .getResponse()
+                .getContentAsString();
+        Long eventId = objectMapper.readTree(eventResponse).get("id").asLong();
+
+        String first = mockMvc.perform(post("/api/events/{eventId}/timeline", eventId)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"plannedTime\":\"09:00\",\"description\":\"Setup\"}"))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.position").value(1))
+                .andReturn().getResponse().getContentAsString();
+        Long firstId = objectMapper.readTree(first).get("id").asLong();
+
+        String second = mockMvc.perform(post("/api/events/{eventId}/timeline", eventId)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"plannedTime\":\"10:00\",\"description\":\"Soundcheck\"}"))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.position").value(2))
+                .andReturn().getResponse().getContentAsString();
+        Long secondId = objectMapper.readTree(second).get("id").asLong();
+
+        mockMvc.perform(put("/api/events/{eventId}/timeline/{itemId}", eventId, firstId)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"plannedTime\":\"09:30\",\"description\":\"Setup Updated\"}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.description").value("Setup Updated"));
+
+        mockMvc.perform(put("/api/events/{eventId}/timeline/reorder", eventId)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("[" + secondId + "," + firstId + "]"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[0].id").value(secondId))
+                .andExpect(jsonPath("$[0].position").value(1));
+
+        mockMvc.perform(delete("/api/events/{eventId}/timeline/{itemId}", eventId, secondId))
+                .andExpect(status().isNoContent());
+
+        mockMvc.perform(get("/api/events/{eventId}/timeline", eventId))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.length()").value(1));
+    }
+
+    @Test
+    void programCrudAndReorder_ShouldWork() throws Exception {
+        String eventResponse = mockMvc.perform(post("/api/events")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(createEventDto("Program Event"))))
+                .andExpect(status().isCreated())
+                .andReturn()
+                .getResponse()
+                .getContentAsString();
+        Long eventId = objectMapper.readTree(eventResponse).get("id").asLong();
+
+        String first = mockMvc.perform(post("/api/events/{eventId}/program", eventId)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"title\":\"Song A\",\"artist\":\"Band\",\"plannedTime\":\"19:00\"}"))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.position").value(1))
+                .andReturn().getResponse().getContentAsString();
+        Long firstId = objectMapper.readTree(first).get("id").asLong();
+
+        String second = mockMvc.perform(post("/api/events/{eventId}/program", eventId)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"title\":\"Song B\",\"plannedTime\":\"19:10\"}"))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.position").value(2))
+                .andReturn().getResponse().getContentAsString();
+        Long secondId = objectMapper.readTree(second).get("id").asLong();
+
+        mockMvc.perform(put("/api/events/{eventId}/program/{itemId}", eventId, firstId)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"title\":\"Song A Updated\",\"artist\":\"Band\",\"plannedTime\":\"19:01\"}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.title").value("Song A Updated"));
+
+        mockMvc.perform(put("/api/events/{eventId}/program/reorder", eventId)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("[" + secondId + "," + firstId + "]"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[0].id").value(secondId))
+                .andExpect(jsonPath("$[0].position").value(1));
+
+        mockMvc.perform(delete("/api/events/{eventId}/program/{itemId}", eventId, secondId))
+                .andExpect(status().isNoContent());
+
+        mockMvc.perform(get("/api/events/{eventId}/program", eventId))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.length()").value(1));
+    }
+
     private EventCreateDto createEventDto(String title) {
         EventCreateDto dto = new EventCreateDto();
         dto.setTitle(title);

@@ -25,6 +25,9 @@ public class UserMapper {
         d.setEmail(u.getEmail());
         d.setRole(u.getRole());
         d.setCreatedAt(u.getCreatedAt());
+        if (u.getAvatarData() != null && u.getAvatarData().length > 0) {
+            d.setAvatarUrl("/api/users/" + u.getId() + "/avatar");
+        }
         return d;
     }
 }

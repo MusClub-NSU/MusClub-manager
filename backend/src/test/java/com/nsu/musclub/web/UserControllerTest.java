@@ -10,6 +10,7 @@ import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMock
 import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.mock.web.MockMultipartFile;
 
 import static org.hamcrest.Matchers.*;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
@@ -293,6 +294,63 @@ class UserControllerTest extends AbstractIntegrationTest {
     @Test
     void deleteUser_WithNonExistentId_ShouldReturn404() throws Exception {
         mockMvc.perform(delete("/api/users/{id}", 99999L))
+                .andExpect(status().isNotFound());
+    }
+
+    @Test
+    void uploadAvatar_ThenGetAvatar_ShouldWork() throws Exception {
+        UserCreateDto createDto = new UserCreateDto();
+        createDto.setUsername("avataruser");
+        createDto.setEmail("avatar@example.com");
+        createDto.setRole("MEMBER");
+
+        String response = mockMvc.perform(post("/api/users")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(createDto)))
+                .andExpect(status().isCreated())
+                .andReturn()
+                .getResponse()
+                .getContentAsString();
+
+        Long id = objectMapper.readTree(response).get("id").asLong();
+        byte[] avatar = new byte[]{1, 2, 3, 4, 5};
+        MockMultipartFile file = new MockMultipartFile("file", "avatar.png", "image/png", avatar);
+
+        mockMvc.perform(multipart("/api/users/{id}/avatar", id).file(file))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.avatarUrl").value("/api/users/" + id + "/avatar"));
+
+        mockMvc.perform(get("/api/users/{id}/avatar", id))
+                .andExpect(status().isOk())
+                .andExpect(content().contentType("image/png"))
+                .andExpect(content().bytes(avatar));
+    }
+
+    @Test
+    void deleteAvatar_ShouldReturn204() throws Exception {
+        UserCreateDto createDto = new UserCreateDto();
+        createDto.setUsername("avatardelete");
+        createDto.setEmail("avatardelete@example.com");
+        createDto.setRole("MEMBER");
+
+        String response = mockMvc.perform(post("/api/users")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(createDto)))
+                .andExpect(status().isCreated())
+                .andReturn()
+                .getResponse()
+                .getContentAsString();
+
+        Long id = objectMapper.readTree(response).get("id").asLong();
+        MockMultipartFile file = new MockMultipartFile("file", "avatar.png", "image/png", new byte[]{9, 8, 7});
+
+        mockMvc.perform(multipart("/api/users/{id}/avatar", id).file(file))
+                .andExpect(status().isOk());
+
+        mockMvc.perform(delete("/api/users/{id}/avatar", id))
+                .andExpect(status().isNoContent());
+
+        mockMvc.perform(get("/api/users/{id}/avatar", id))
                 .andExpect(status().isNotFound());
     }
 }
