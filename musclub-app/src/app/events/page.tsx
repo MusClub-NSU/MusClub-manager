@@ -7,9 +7,11 @@ import { useSidebar } from '../context/SidebarContext';
 import { useEvents } from '../../hooks/useApi';
 import { Event } from '../../types/api';
 import { useRouter } from 'next/navigation';
+import { useCurrentUserRole } from '../../hooks/useCurrentUserRole';
 
 export default function EventsPage() {
     const { visible, setDisabled } = useSidebar();
+    const { canManageEvents } = useCurrentUserRole();
     const { events, loading, error, createEvent, updateEvent, deleteEvent } = useEvents({ page: 0, size: 20 });
     const [isCreating, setIsCreating] = useState(false);
     const [editingEvent, setEditingEvent] = useState<Event | null>(null);
@@ -23,6 +25,7 @@ export default function EventsPage() {
     const router = useRouter();
 
     const handleCreateEvent = async () => {
+        if (!canManageEvents) return;
         try {
             // Создаем время в будущем (через 1 час от текущего момента)
             const futureTime = new Date();
@@ -153,16 +156,18 @@ export default function EventsPage() {
         >
             <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3 pl-12 sm:pl-0">
                 <h1 className="text-3xl font-bold leading-tight">Мероприятия</h1>
-                <Button
-                    view="action"
-                    onClick={handleCreateEvent}
-                    disabled={isCreating || visible}
-                >
-                    <span className="flex items-center justify-center gap-2">
-                        <Icon data={Plus} size={16} />
-                        <span>Добавить мероприятие</span>
-                    </span>
-                </Button>
+                {canManageEvents && (
+                    <Button
+                        view="action"
+                        onClick={handleCreateEvent}
+                        disabled={isCreating || visible}
+                    >
+                        <span className="flex items-center justify-center gap-2">
+                            <Icon data={Plus} size={16} />
+                            <span>Добавить мероприятие</span>
+                        </span>
+                    </Button>
+                )}
             </div>
 
             {events.length === 0 ? (
@@ -214,24 +219,26 @@ export default function EventsPage() {
                                     <span className="font-bold text-green-600">Активно</span>
                                 </div>
 
-                                <div className="flex gap-2">
-                                    <Button
-                                        view="flat"
-                                        size="s"
-                                        onClick={() => handleEditEvent(event)}
-                                        disabled={visible}
-                                    >
-                                        <Icon data={Pencil} size={14} />
-                                    </Button>
-                                    <Button
-                                        view="flat"
-                                        size="s"
-                                        onClick={() => handleDeleteEvent(event.id)}
-                                        disabled={visible}
-                                    >
-                                        <Icon data={TrashBin} size={14} />
-                                    </Button>
-                                </div>
+                                {canManageEvents && (
+                                    <div className="flex gap-2">
+                                        <Button
+                                            view="flat"
+                                            size="s"
+                                            onClick={() => handleEditEvent(event)}
+                                            disabled={visible}
+                                        >
+                                            <Icon data={Pencil} size={14} />
+                                        </Button>
+                                        <Button
+                                            view="flat"
+                                            size="s"
+                                            onClick={() => handleDeleteEvent(event.id)}
+                                            disabled={visible}
+                                        >
+                                            <Icon data={TrashBin} size={14} />
+                                        </Button>
+                                    </div>
+                                )}
                             </div>
 
                             {/* Кнопка записи */}

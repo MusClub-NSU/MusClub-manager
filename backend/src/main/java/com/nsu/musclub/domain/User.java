@@ -23,9 +23,8 @@ public class User {
     @Column(name = "created_at", nullable = false)
     private OffsetDateTime createdAt = OffsetDateTime.now();
 
-    @Lob
     @Basic(fetch = FetchType.LAZY)
-    @Column(name = "avatar_data", columnDefinition = "BYTEA")
+    @Column(name = "avatar_data")
     private byte[] avatarData;
 
     @Column(name = "avatar_content_type", length = 100)

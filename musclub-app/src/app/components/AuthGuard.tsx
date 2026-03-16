@@ -3,9 +3,11 @@
 import { useSession, signIn } from 'next-auth/react';
 import { Loader, Text, Button } from '@gravity-ui/uikit';
 import { useEffect } from 'react';
+import { usePathname } from 'next/navigation';
 
 export default function AuthGuard({ children }: { children: React.ReactNode }) {
     const { data: session, status } = useSession();
+    const pathname = usePathname();
 
     useEffect(() => {
         // Если токен истёк с ошибкой — перелогиниваем
@@ -13,6 +15,9 @@ export default function AuthGuard({ children }: { children: React.ReactNode }) {
             signIn('keycloak');
         }
     }, [session]);
+
+    // Главная страница всегда доступна для гостей (будет только просмотр событий и кнопка авторизации)
+    const isPublicHome = pathname === '/';
 
     if (status === 'loading') {
         return (
@@ -25,7 +30,7 @@ export default function AuthGuard({ children }: { children: React.ReactNode }) {
         );
     }
 
-    if (status === 'unauthenticated') {
+    if (status === 'unauthenticated' && !isPublicHome) {
         return (
             <div className="flex items-center justify-center min-h-screen">
                 <div className="flex flex-col items-center gap-6 text-center p-8">
@@ -41,3 +46,4 @@ export default function AuthGuard({ children }: { children: React.ReactNode }) {
 
     return <>{children}</>;
 }
+

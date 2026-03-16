@@ -6,9 +6,11 @@ import { Plus, Pencil, TrashBin, Xmark } from '@gravity-ui/icons';
 import { useState } from 'react';
 import { User } from '../../types/api';
 import { useSidebar } from '../context/SidebarContext';
+import { useCurrentUserRole } from '../../hooks/useCurrentUserRole';
 
 export default function ParticipantsPage() {
     const { visible: sidebarVisible } = useSidebar();
+    const { canManageUsers } = useCurrentUserRole();
     const { users, loading, error, createUser, updateUser, deleteUser, refetch } = useUsers({ page: 0, size: 20 });
     const [isCreating, setIsCreating] = useState(false);
     const [editingUser, setEditingUser] = useState<User | null>(null);
@@ -19,6 +21,7 @@ export default function ParticipantsPage() {
     });
 
     const handleCreateUser = async () => {
+        if (!canManageUsers) return;
         setIsCreating(true);
         try {
             // Генерируем уникальные данные для нового пользователя
@@ -121,16 +124,18 @@ export default function ParticipantsPage() {
             <div className="w-full max-w-4xl">
                 <div className="flex justify-between items-center mb-6">
                     <h1 className="text-3xl font-bold">Участники</h1>
-                    <Button
-                        view="action"
-                        onClick={handleCreateUser}
-                        disabled={isCreating || sidebarVisible}
-                    >
-                        <span className="flex items-center justify-center gap-2">
-                        <Icon data={Plus} size={16} />
-                            <span>Добавить участника</span>
-                        </span>
-                    </Button>
+                    {canManageUsers && (
+                        <Button
+                            view="action"
+                            onClick={handleCreateUser}
+                            disabled={isCreating || sidebarVisible}
+                        >
+                            <span className="flex items-center justify-center gap-2">
+                                <Icon data={Plus} size={16} />
+                                <span>Добавить участника</span>
+                            </span>
+                        </Button>
+                    )}
                 </div>
 
                 {users.length === 0 ? (
@@ -179,24 +184,26 @@ export default function ParticipantsPage() {
                                             {new Date(user.createdAt).toLocaleDateString('ru-RU')}
                                         </td>
                                         <td className="px-4 py-3">
-                                            <div className="flex gap-2">
-                                                <Button
-                                                    view="flat"
-                                                    size="s"
-                                                    onClick={() => handleEditUser(user)}
-                                                    disabled={sidebarVisible}
-                                                >
-                                                    <Icon data={Pencil} size={14} />
-                                                </Button>
-                                                <Button
-                                                    view="flat"
-                                                    size="s"
-                                                    onClick={() => handleDeleteUser(user.id)}
-                                                    disabled={sidebarVisible}
-                                                >
-                                                    <Icon data={TrashBin} size={14} />
-                                                </Button>
-                                            </div>
+                                            {canManageUsers && (
+                                                <div className="flex gap-2">
+                                                    <Button
+                                                        view="flat"
+                                                        size="s"
+                                                        onClick={() => handleEditUser(user)}
+                                                        disabled={sidebarVisible}
+                                                    >
+                                                        <Icon data={Pencil} size={14} />
+                                                    </Button>
+                                                    <Button
+                                                        view="flat"
+                                                        size="s"
+                                                        onClick={() => handleDeleteUser(user.id)}
+                                                        disabled={sidebarVisible}
+                                                    >
+                                                        <Icon data={TrashBin} size={14} />
+                                                    </Button>
+                                                </div>
+                                            )}
                                         </td>
                                     </tr>
                                 ))}
@@ -206,7 +213,7 @@ export default function ParticipantsPage() {
                 )}
             </div>
 
-            {editingUser && (
+            {editingUser && canManageUsers && (
                 <div
                     className="fixed inset-0 flex items-center justify-center bg-background/70 backdrop-blur-sm z-50 px-6"
                     onClick={handleCloseEdit}

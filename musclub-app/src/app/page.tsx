@@ -3,8 +3,10 @@
 import { useEvents } from '../hooks/useApi';
 import { Card, Text, Loader, Button } from '@gravity-ui/uikit';
 import Link from 'next/link';
+import { signIn, useSession } from 'next-auth/react';
 
 export default function Home() {
+    const { data: session } = useSession();
     const { events, loading: eventsLoading, error: eventsError } = useEvents({ page: 0, size: 100 });
 
     if (eventsLoading) {
@@ -28,14 +30,21 @@ export default function Home() {
 
     return (
         <main className="min-h-screen">
-            <header className="sticky top-0 z-10 py-4 pr-4 pl-14 sm:px-4">
+            <header className="sticky top-0 z-10 py-4 pr-4 pl-14 sm:px-4 bg-background/80 backdrop-blur">
                 <div className="mx-auto w-full max-w-5xl flex items-center justify-between gap-4">
                     <h1 className="text-xl sm:text-2xl md:text-3xl font-bold">
                         Добро пожаловать в MusClub Manager
                     </h1>
-                    <Button view="action" size="m" className="shrink-0">
-                        Авторизация
-                    </Button>
+                    {!session && (
+                        <Button
+                            view="action"
+                            size="m"
+                            className="shrink-0"
+                            onClick={() => signIn('keycloak')}
+                        >
+                            Авторизоваться
+                        </Button>
+                    )}
                 </div>
             </header>
 

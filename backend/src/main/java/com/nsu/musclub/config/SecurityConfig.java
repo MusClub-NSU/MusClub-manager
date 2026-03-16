@@ -10,6 +10,8 @@ import org.springframework.security.oauth2.server.resource.authentication.JwtAut
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.web.cors.CorsConfigurationSource;
 
+import org.springframework.http.HttpMethod;
+
 import java.util.Collection;
 import java.util.List;
 import java.util.Map;
@@ -29,6 +31,10 @@ public class SecurityConfig {
             .authorizeHttpRequests(auth -> auth
                 // Swagger UI и OpenAPI docs — публичные
                 .requestMatchers("/swagger/**", "/api/docs/**", "/swagger-ui/**", "/v3/api-docs/**").permitAll()
+                // Публичный доступ к просмотру мероприятий (для главной страницы)
+                .requestMatchers("/api/events/**").permitAll()
+                // Временный публичный доступ к созданию пользователей (вызов только из фронтенда)
+                .requestMatchers(HttpMethod.POST, "/api/users/**").permitAll()
                 // Все остальные API требуют аутентификации
                 .anyRequest().authenticated()
             )

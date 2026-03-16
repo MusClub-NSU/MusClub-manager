@@ -109,52 +109,58 @@ export default function Sidebar() {
                                 Главная
                             </Link>
 
-                            <Link
-                                href="/participants"
-                                onClick={() => setVisible(false)}
-                                style={{
-                                    display: 'flex',
-                                    alignItems: 'center',
-                                    gap: '10px',
-                                    textDecoration: 'none',
-                                    fontSize: '18px',
-                                    padding: '8px 12px',
-                                    borderRadius: '8px',
-                                    transition: 'background 0.2s',
-                                }}
-                            >
-                                <Icon data={Persons} size={20} />
-                                Участники
-                            </Link>
+                            {session && (
+                                <>
+                                    <Link
+                                        href="/participants"
+                                        onClick={() => setVisible(false)}
+                                        style={{
+                                            display: 'flex',
+                                            alignItems: 'center',
+                                            gap: '10px',
+                                            textDecoration: 'none',
+                                            fontSize: '18px',
+                                            padding: '8px 12px',
+                                            borderRadius: '8px',
+                                            transition: 'background 0.2s',
+                                        }}
+                                    >
+                                        <Icon data={Persons} size={20} />
+                                        Участники
+                                    </Link>
 
-                            <Link
-                                href="/events"
-                                onClick={() => setVisible(false)}
-                                style={{
-                                    display: 'flex',
-                                    alignItems: 'center',
-                                    gap: '10px',
-                                    textDecoration: 'none',
-                                    fontSize: '18px',
-                                    padding: '8px 12px',
-                                    borderRadius: '8px',
-                                    transition: 'background 0.2s',
-                                }}
-                            >
-                                <Icon data={Calendar} size={20} />
-                                Мероприятия
-                            </Link>
+                                    <Link
+                                        href="/events"
+                                        onClick={() => setVisible(false)}
+                                        style={{
+                                            display: 'flex',
+                                            alignItems: 'center',
+                                            gap: '10px',
+                                            textDecoration: 'none',
+                                            fontSize: '18px',
+                                            padding: '8px 12px',
+                                            borderRadius: '8px',
+                                            transition: 'background 0.2s',
+                                        }}
+                                    >
+                                        <Icon data={Calendar} size={20} />
+                                        Мероприятия
+                                    </Link>
+                                </>
+                            )}
                         </nav>
 
                         <div style={{ marginTop: 'auto', display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                            <Button
-                                view="outlined-danger"
-                                width="max"
-                                onClick={() => signOut({ callbackUrl: '/' })}
-                            >
-                                <Icon data={ArrowRightFromSquare} size={16} />
-                                Выйти
-                            </Button>
+                            {session ? (
+                                <Button
+                                    view="outlined-danger"
+                                    width="max"
+                                    onClick={() => signOut({ callbackUrl: '/' })}
+                                >
+                                    <Icon data={ArrowRightFromSquare} size={16} />
+                                    Выйти
+                                </Button>
+                            ) : null}
                             <Text variant="caption-2" color="secondary" style={{ textAlign: 'center' }}>
                                 © MusClub App
                             </Text>
