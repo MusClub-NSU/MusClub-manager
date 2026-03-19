@@ -65,9 +65,6 @@ export default function Home() {
                             <Text color="secondary" className="text-sm">
                                 Создайте новое мероприятие или проверьте даты существующих.
                             </Text>
-                            <Link href="/events" className="text-blue-600 hover:underline mt-2 w-fit">
-                                Перейти к мероприятиям →
-                            </Link>
                         </div>
                     ) : (
                         <div className="divide-y">

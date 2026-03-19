@@ -56,6 +56,21 @@ public class UserServiceImpl implements UserService {
         var u = users.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Пользователь", id));
 
+        // UI may send partial updates (e.g. only username). Keep existing fields if omitted.
+        if (dto.getUsername() == null) dto.setUsername(u.getUsername());
+        if (dto.getEmail() == null) dto.setEmail(u.getEmail());
+        if (dto.getRole() == null) dto.setRole(u.getRole());
+
+        if (dto.getUsername().isBlank()) {
+            throw new BadRequestException("Имя пользователя обязательно", "USERNAME_REQUIRED");
+        }
+        if (dto.getEmail().isBlank()) {
+            throw new BadRequestException("Email обязателен", "EMAIL_REQUIRED");
+        }
+        if (dto.getRole().isBlank()) {
+            throw new BadRequestException("Роль обязательна", "ROLE_REQUIRED");
+        }
+
         if (!u.getUsername().equals(dto.getUsername()) && users.existsByUsername(dto.getUsername())) {
             throw new ResourceAlreadyExistsException("Пользователь", "username", dto.getUsername());
         }

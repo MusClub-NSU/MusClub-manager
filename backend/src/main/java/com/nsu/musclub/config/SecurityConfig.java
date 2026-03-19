@@ -33,6 +33,8 @@ public class SecurityConfig {
                 .requestMatchers("/swagger/**", "/api/docs/**", "/swagger-ui/**", "/v3/api-docs/**").permitAll()
                 // Публичный доступ к просмотру мероприятий (для главной страницы)
                 .requestMatchers("/api/events/**").permitAll()
+                // Аватары пользователей должны грузиться через <img> без Bearer-токена
+                .requestMatchers(HttpMethod.GET, "/api/users/*/avatar").permitAll()
                 // Временный публичный доступ к созданию пользователей (вызов только из фронтенда)
                 .requestMatchers(HttpMethod.POST, "/api/users/**").permitAll()
                 // Все остальные API требуют аутентификации

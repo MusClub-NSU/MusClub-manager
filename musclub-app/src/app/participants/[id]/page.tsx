@@ -8,16 +8,23 @@ import { useUsers } from '@/hooks/useApi';
 import { useSidebar } from '../../context/SidebarContext';
 import { PushNotificationSettings } from '../../components/PushNotificationSettings';
 import { apiClient } from '@/lib/api';
+import { useCurrentUserRole } from '@/hooks/useCurrentUserRole';
+import { useSession } from 'next-auth/react';
 
 export default function UserDetailsPage() {
     const params = useParams();
     const router = useRouter();
     const { visible } = useSidebar();
+    const { canManageUsers } = useCurrentUserRole();
+    const { data: session } = useSession();
 
     const userId = Number(params.id);
 
     const { users, loading, error, updateUser, refetch } = useUsers({ page: 0, size: 999 });
     const user = users.find((u) => u.id === userId);
+    const isSelf = !!session?.user?.email && session.user.email === user?.email;
+    const canEditProfile = isSelf || canManageUsers;
+    const canEditAvatar = canEditProfile;
 
     const [isEditing, setIsEditing] = useState(false);
     const [editData, setEditData] = useState({
@@ -57,11 +64,17 @@ export default function UserDetailsPage() {
     }
 
     const handleSave = async () => {
-        await updateUser(user.id, editData);
+        if (!canEditProfile) return;
+        if (canManageUsers) {
+            await updateUser(user.id, editData);
+        } else {
+            await updateUser(user.id, { username: editData.username });
+        }
         setIsEditing(false);
     };
 
     const handleAvatarChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+        if (!canEditAvatar) return;
         const file = e.target.files?.[0];
         if (!file) return;
         const preview = URL.createObjectURL(file);
@@ -75,6 +88,7 @@ export default function UserDetailsPage() {
     };
 
     const handleDeleteAvatar = async () => {
+        if (!canEditAvatar) return;
         try {
             await apiClient.deleteUserAvatar(user.id);
             setAvatarPreview(null);
@@ -175,7 +189,7 @@ export default function UserDetailsPage() {
                         {/* Email */}
                         <div className="flex items-center gap-3 w-full">
                             <Icon data={LogoTelegram} size={20} className="shrink-0"/>
-                            {isEditing ? (
+                            {isEditing && canManageUsers ? (
                                 <input
                                     type="email"
                                     value={editData.email}
@@ -203,7 +217,7 @@ export default function UserDetailsPage() {
                         {/* Роль пользователя */}
                         <div className="flex items-center gap-3 w-full">
                             <Icon data={Person} size={20} className="shrink-0"/>
-                            {isEditing ? (
+                            {isEditing && canManageUsers ? (
                                 <Select
                                     value={[editData.role]}
                                     onUpdate={([value]) => setEditData({...editData, role: value})}
@@ -256,10 +270,12 @@ export default function UserDetailsPage() {
                             Назад
                         </Button>
 
-                        <Button view="outlined" className="min-w-[160px]" size="l" onClick={() => setIsEditing(true)}
-                                disabled={visible}>
-                            Редактировать
-                        </Button>
+                        {canEditProfile && (
+                            <Button view="outlined" className="min-w-[160px]" size="l" onClick={() => setIsEditing(true)}
+                                    disabled={visible}>
+                                Редактировать
+                            </Button>
+                        )}
                     </>
                 )}
             </div>

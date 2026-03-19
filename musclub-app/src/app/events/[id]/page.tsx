@@ -8,6 +8,7 @@ import { useEvents, useUsers } from '@/hooks/useApi';
 import { useSidebar } from '../../context/SidebarContext';
 import { apiClient } from '@/lib/api';
 import { EventMember } from '@/types/api';
+import { useCurrentUserRole } from '@/hooks/useCurrentUserRole';
 
 interface TimelineEvent {
     id: number;
@@ -30,6 +31,7 @@ export default function EventDetailsPage() {
     const { events, loading, error, updateEvent, refetch } = useEvents({ page: 0, size: 100 });
     const { users, loading: usersLoading } = useUsers({ page: 0, size: 100 });
     const { visible } = useSidebar();
+    const { canManageEvents } = useCurrentUserRole();
     const [activeTab, setActiveTab] = useState('assignments');
 
     // Состояние для участников события
@@ -211,6 +213,7 @@ export default function EventDetailsPage() {
     const { date, time } = formatDateTime(editData.startTime || event.startTime);
 
     const handleGenerateAiDescription = async () => {
+        if (!canManageEvents) return;
         if (!event?.id) return;
         try {
             setAiGenerating(true);
@@ -254,6 +257,7 @@ export default function EventDetailsPage() {
 
     // Функции для работы с ролями и участниками
     const handleCreateRole = () => {
+        if (!canManageEvents) return;
         if (!newRoleName.trim()) return;
         const roleName = newRoleName.trim();
         if (!createdRoles.includes(roleName) && !roleNames.includes(roleName)) {
@@ -265,6 +269,7 @@ export default function EventDetailsPage() {
     };
 
     const handleAddPersonToRole = async (roleName: string) => {
+        if (!canManageEvents) return;
         if (!event?.id || !selectedUserId) return;
         try {
             await apiClient.upsertEventMember(event.id, {
@@ -283,6 +288,7 @@ export default function EventDetailsPage() {
     };
 
     const handleRemoveMember = async (userId: number) => {
+        if (!canManageEvents) return;
         if (!event?.id) return;
         try {
             await apiClient.removeEventMember(event.id, userId);
@@ -304,6 +310,7 @@ export default function EventDetailsPage() {
 
     // Функции для работы с таймлайном
     const handleOpenAddForm = () => {
+        if (!canManageEvents) return;
         setNewTimelineTime('09:00');
         setNewTimelineDescription('');
         setEditingTimelineEventId(null);
@@ -311,6 +318,7 @@ export default function EventDetailsPage() {
     };
 
     const handleEditTimelineEvent = (eventId: number) => {
+        if (!canManageEvents) return;
         const event = timelineEvents.find(e => e.id === eventId);
         if (event) {
             setNewTimelineTime(event.time);
@@ -321,6 +329,7 @@ export default function EventDetailsPage() {
     };
 
     const handleSaveTimelineEvent = async () => {
+        if (!canManageEvents) return;
         if (!event?.id || !newTimelineDescription.trim()) return;
         try {
             if (editingTimelineEventId) {
@@ -345,6 +354,7 @@ export default function EventDetailsPage() {
     };
 
     const handleDeleteTimelineEvent = async (timelineEventId: number) => {
+        if (!canManageEvents) return;
         if (!event?.id) return;
         try {
             await apiClient.deleteEventTimelineItem(event.id, timelineEventId);
@@ -356,6 +366,7 @@ export default function EventDetailsPage() {
 
     // Функции для работы с концертной программой
     const handleOpenAddProgramForm = () => {
+        if (!canManageEvents) return;
         setNewProgramTitle('');
         setNewProgramArtist('');
         setNewProgramTime('');
@@ -366,6 +377,7 @@ export default function EventDetailsPage() {
     };
 
     const handleEditProgramItem = (itemId: number) => {
+        if (!canManageEvents) return;
         const item = programItems.find(i => i.id === itemId);
         if (item) {
             setNewProgramTitle(item.title);
@@ -379,6 +391,7 @@ export default function EventDetailsPage() {
     };
 
     const handleSaveProgramItem = async () => {
+        if (!canManageEvents) return;
         if (!event?.id || !newProgramTitle.trim()) return;
         try {
             const payload = {
@@ -409,6 +422,7 @@ export default function EventDetailsPage() {
     };
 
     const handleDeleteProgramItem = async (itemId: number) => {
+        if (!canManageEvents) return;
         if (!event?.id) return;
         try {
             await apiClient.deleteEventProgramItem(event.id, itemId);
@@ -419,6 +433,7 @@ export default function EventDetailsPage() {
     };
 
     const handleMoveProgramItem = async (itemId: number, direction: 'up' | 'down') => {
+        if (!canManageEvents) return;
         if (!event?.id) return;
         const index = programItems.findIndex(item => item.id === itemId);
         if (index === -1) return;
@@ -532,26 +547,28 @@ export default function EventDetailsPage() {
                             </Text>
                         </Card>
                     )}
-                    <div className="flex flex-col sm:flex-row sm:items-center gap-3">
-                        <Button
-                            view="action"
-                            size="m"
-                            onClick={handleGenerateAiDescription}
-                            loading={aiGenerating}
-                            disabled={aiGenerating}
-                        >
-                            Сгенерировать текст афиши
-                        </Button>
-                        <label className="flex items-center gap-2 text-sm text-[--g-color-text-secondary]">
-                            <input
-                                type="checkbox"
-                                checked={saveAiDescription}
-                                onChange={(e) => setSaveAiDescription(e.target.checked)}
-                                className="w-4 h-4"
-                            />
-                            <span>Сохранить результат в событии</span>
-                        </label>
-                    </div>
+                        {canManageEvents && (
+                            <div className="flex flex-col sm:flex-row sm:items-center gap-3">
+                                <Button
+                                    view="action"
+                                    size="m"
+                                    onClick={handleGenerateAiDescription}
+                                    loading={aiGenerating}
+                                    disabled={aiGenerating}
+                                >
+                                    Сгенерировать текст афиши
+                                </Button>
+                                <label className="flex items-center gap-2 text-sm text-[--g-color-text-secondary]">
+                                    <input
+                                        type="checkbox"
+                                        checked={saveAiDescription}
+                                        onChange={(e) => setSaveAiDescription(e.target.checked)}
+                                        className="w-4 h-4"
+                                    />
+                                    <span>Сохранить результат в событии</span>
+                                </label>
+                            </div>
+                        )}
                     {aiError && (
                         <Text color="danger" className="text-sm">
                             {aiError}
@@ -585,7 +602,7 @@ export default function EventDetailsPage() {
                     <div className="space-y-4">
                         <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3 sm:gap-0 mb-4">
                             <Text variant="subheader-1" className="text-lg sm:text-xl">Назначенные роли и люди</Text>
-                            {!showAddRole && (
+                            {canManageEvents && !showAddRole && (
                                 <Button
                                     view="action"
                                     size="m"
@@ -682,7 +699,7 @@ export default function EventDetailsPage() {
                                                     )}
                                                 </div>
                                                 <div className="flex gap-2">
-                                                    {showAddPerson !== roleName && (
+                                                    {canManageEvents && showAddPerson !== roleName && (
                                                         <Button
                                                             view="flat"
                                                             size="s"
@@ -772,6 +789,7 @@ export default function EventDetailsPage() {
                                                                     e.stopPropagation();
                                                                     handleRemoveMember(member.userId);
                                                                 }}
+                                                                disabled={!canManageEvents}
                                                             >
                                                                 <Icon data={TrashBin} size={14}/>
                                                             </Button>
@@ -796,7 +814,7 @@ export default function EventDetailsPage() {
                     <div className="space-y-6">
                         <div className="flex justify-between items-center">
                             <Text variant="subheader-1" className="font-bold">Планирование таймлайна</Text>
-                            {!showAddTimelineEvent && (
+                            {canManageEvents && !showAddTimelineEvent && (
                                 <Button
                                     view="action"
                                     size="m"
@@ -923,20 +941,24 @@ export default function EventDetailsPage() {
                                                     
                                                     {/* Кнопки действий */}
                                                     <div className="flex gap-2 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity">
-                                                        <Button
-                                                            view="flat"
-                                                            size="s"
-                                                            onClick={() => handleEditTimelineEvent(event.id)}
-                                                        >
-                                                            <Icon data={Pencil} size={14} />
-                                                        </Button>
-                                                        <Button
-                                                            view="flat"
-                                                            size="s"
-                                                            onClick={() => handleDeleteTimelineEvent(event.id)}
-                                                        >
-                                                            <Icon data={TrashBin} size={14} />
-                                                        </Button>
+                                                        {canManageEvents && (
+                                                            <>
+                                                                <Button
+                                                                    view="flat"
+                                                                    size="s"
+                                                                    onClick={() => handleEditTimelineEvent(event.id)}
+                                                                >
+                                                                    <Icon data={Pencil} size={14} />
+                                                                </Button>
+                                                                <Button
+                                                                    view="flat"
+                                                                    size="s"
+                                                                    onClick={() => handleDeleteTimelineEvent(event.id)}
+                                                                >
+                                                                    <Icon data={TrashBin} size={14} />
+                                                                </Button>
+                                                            </>
+                                                        )}
                                                     </div>
                                                 </div>
                                             </Card>
@@ -953,7 +975,7 @@ export default function EventDetailsPage() {
                     <div className="space-y-6">
                         <div className="flex justify-between items-center">
                             <Text variant="subheader-1" className="font-bold">Концертная программа</Text>
-                            {!showAddProgramItem && (
+                            {canManageEvents && !showAddProgramItem && (
                                 <Button
                                     view="action"
                                     size="m"
@@ -1118,38 +1140,42 @@ export default function EventDetailsPage() {
                                             
                                             {/* Кнопки действий */}
                                             <div className="flex gap-2 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity">
-                                                <div className="flex flex-col gap-1">
-                                                    <Button
-                                                        view="flat"
-                                                        size="s"
-                                                        onClick={() => handleMoveProgramItem(item.id, 'up')}
-                                                        disabled={idx === 0}
-                                                    >
-                                                        <Icon data={ArrowUp} size={14} />
-                                                    </Button>
-                                                    <Button
-                                                        view="flat"
-                                                        size="s"
-                                                        onClick={() => handleMoveProgramItem(item.id, 'down')}
-                                                        disabled={idx === programItems.length - 1}
-                                                    >
-                                                        <Icon data={ArrowDown} size={14} />
-                                                    </Button>
-                                                </div>
-                                                <Button
-                                                    view="flat"
-                                                    size="s"
-                                                    onClick={() => handleEditProgramItem(item.id)}
-                                                >
-                                                    <Icon data={Pencil} size={14} />
-                                                </Button>
-                                                <Button
-                                                    view="flat"
-                                                    size="s"
-                                                    onClick={() => handleDeleteProgramItem(item.id)}
-                                                >
-                                                    <Icon data={TrashBin} size={14} />
-                                                </Button>
+                                                {canManageEvents && (
+                                                    <>
+                                                        <div className="flex flex-col gap-1">
+                                                            <Button
+                                                                view="flat"
+                                                                size="s"
+                                                                onClick={() => handleMoveProgramItem(item.id, 'up')}
+                                                                disabled={idx === 0}
+                                                            >
+                                                                <Icon data={ArrowUp} size={14} />
+                                                            </Button>
+                                                            <Button
+                                                                view="flat"
+                                                                size="s"
+                                                                onClick={() => handleMoveProgramItem(item.id, 'down')}
+                                                                disabled={idx === programItems.length - 1}
+                                                            >
+                                                                <Icon data={ArrowDown} size={14} />
+                                                            </Button>
+                                                        </div>
+                                                        <Button
+                                                            view="flat"
+                                                            size="s"
+                                                            onClick={() => handleEditProgramItem(item.id)}
+                                                        >
+                                                            <Icon data={Pencil} size={14} />
+                                                        </Button>
+                                                        <Button
+                                                            view="flat"
+                                                            size="s"
+                                                            onClick={() => handleDeleteProgramItem(item.id)}
+                                                        >
+                                                            <Icon data={TrashBin} size={14} />
+                                                        </Button>
+                                                    </>
+                                                )}
                                             </div>
                                         </div>
                                     </Card>
@@ -1181,23 +1207,25 @@ export default function EventDetailsPage() {
                         >
                             Назад
                         </Button>
-                        <Button
-                            view="outlined"
-                            className="min-w-[160px]"
-                            size="l"
-                            onClick={() => {
-                                setEditData({
-                                    title: event?.title || '',
-                                    description: event?.description || '',
-                                    startTime: toLocalInputFormat(event?.startTime || ''),
-                                    endTime: toLocalInputFormat(event?.endTime || ''),
-                                    venue: event?.venue || ''
-                                });
-                                setIsEditing(true);
-                            }}
-                        >
-                            Редактировать
-                        </Button>
+                        {canManageEvents && (
+                            <Button
+                                view="outlined"
+                                className="min-w-[160px]"
+                                size="l"
+                                onClick={() => {
+                                    setEditData({
+                                        title: event?.title || '',
+                                        description: event?.description || '',
+                                        startTime: toLocalInputFormat(event?.startTime || ''),
+                                        endTime: toLocalInputFormat(event?.endTime || ''),
+                                        venue: event?.venue || ''
+                                    });
+                                    setIsEditing(true);
+                                }}
+                            >
+                                Редактировать
+                            </Button>
+                        )}
                     </>
                 )}
             </div>
