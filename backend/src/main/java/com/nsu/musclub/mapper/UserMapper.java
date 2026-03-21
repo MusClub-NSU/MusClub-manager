@@ -25,6 +25,10 @@ public class UserMapper {
         d.setEmail(u.getEmail());
         d.setRole(u.getRole());
         d.setCreatedAt(u.getCreatedAt());
+        // avatarData is LAZY; rely on metadata fields to avoid forcing blob load
+        if (u.getAvatarContentType() != null && !u.getAvatarContentType().isBlank()) {
+            d.setAvatarUrl("/api/users/" + u.getId() + "/avatar");
+        }
         return d;
     }
 }

@@ -3,15 +3,23 @@ package com.nsu.musclub.web;
 import com.nsu.musclub.dto.event.EventCreateDto;
 import com.nsu.musclub.dto.event.EventMemberResponseDto;
 import com.nsu.musclub.dto.event.EventMemberUpsertDto;
+import com.nsu.musclub.dto.event.EventProgramItemCreateDto;
+import com.nsu.musclub.dto.event.EventProgramItemResponseDto;
+import com.nsu.musclub.dto.event.EventProgramItemUpdateDto;
 import com.nsu.musclub.dto.event.EventResponseDto;
+import com.nsu.musclub.dto.event.EventTimelineItemCreateDto;
+import com.nsu.musclub.dto.event.EventTimelineItemResponseDto;
+import com.nsu.musclub.dto.event.EventTimelineItemUpdateDto;
 import com.nsu.musclub.dto.event.EventTreeNodeDto;
 import com.nsu.musclub.dto.event.EventUpdateDto;
 import com.nsu.musclub.dto.event.PosterDescriptionResponseDto;
 import com.nsu.musclub.dto.event.SocialMediaPostRequestDto;
 import com.nsu.musclub.dto.event.SocialMediaPostResponseDto;
 import com.nsu.musclub.service.EventPosterAiService;
+import com.nsu.musclub.service.EventProgramService;
 import com.nsu.musclub.service.EventRelationService;
 import com.nsu.musclub.service.EventService;
+import com.nsu.musclub.service.EventTimelineService;
 import com.nsu.musclub.service.SocialMediaPostAiService;
 import jakarta.validation.Valid;
 import org.springdoc.core.annotations.ParameterObject;
@@ -36,13 +44,23 @@ public class EventController {
     private final EventPosterAiService posterAiService;
     private final SocialMediaPostAiService socialMediaPostAiService;
     private final EventNotificationService notificationService;
+    private final EventTimelineService timelineService;
+    private final EventProgramService programService;
 
-    public EventController(EventService service, EventRelationService relations, EventPosterAiService posterAiService, SocialMediaPostAiService socialMediaPostAiService, EventNotificationService notificationService) {
+    public EventController(EventService service,
+                           EventRelationService relations,
+                           EventPosterAiService posterAiService,
+                           SocialMediaPostAiService socialMediaPostAiService,
+                           EventNotificationService notificationService,
+                           EventTimelineService timelineService,
+                           EventProgramService programService) {
         this.service = service;
         this.relations = relations;
         this.posterAiService = posterAiService;
         this.socialMediaPostAiService = socialMediaPostAiService;
         this.notificationService = notificationService;
+        this.timelineService = timelineService;
+        this.programService = programService;
     }
 
     @PostMapping
@@ -87,6 +105,68 @@ public class EventController {
     @ResponseStatus(HttpStatus.NO_CONTENT)
     public void removeMember(@PathVariable Long eventId, @PathVariable Long userId) {
         relations.removeMember(eventId, userId);
+    }
+
+    @GetMapping("/{eventId}/timeline")
+    public List<EventTimelineItemResponseDto> listTimeline(@PathVariable Long eventId) {
+        return timelineService.list(eventId);
+    }
+
+    @PostMapping("/{eventId}/timeline")
+    @ResponseStatus(HttpStatus.CREATED)
+    public EventTimelineItemResponseDto createTimelineItem(@PathVariable Long eventId,
+                                                           @RequestBody @Valid EventTimelineItemCreateDto dto) {
+        return timelineService.create(eventId, dto);
+    }
+
+    @PutMapping("/{eventId}/timeline/{itemId}")
+    public EventTimelineItemResponseDto updateTimelineItem(@PathVariable Long eventId,
+                                                           @PathVariable Long itemId,
+                                                           @RequestBody @Valid EventTimelineItemUpdateDto dto) {
+        return timelineService.update(eventId, itemId, dto);
+    }
+
+    @DeleteMapping("/{eventId}/timeline/{itemId}")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    public void deleteTimelineItem(@PathVariable Long eventId, @PathVariable Long itemId) {
+        timelineService.delete(eventId, itemId);
+    }
+
+    @PutMapping("/{eventId}/timeline/reorder")
+    public List<EventTimelineItemResponseDto> reorderTimeline(@PathVariable Long eventId,
+                                                              @RequestBody List<Long> itemIds) {
+        return timelineService.reorder(eventId, itemIds);
+    }
+
+    @GetMapping("/{eventId}/program")
+    public List<EventProgramItemResponseDto> listProgram(@PathVariable Long eventId) {
+        return programService.list(eventId);
+    }
+
+    @PostMapping("/{eventId}/program")
+    @ResponseStatus(HttpStatus.CREATED)
+    public EventProgramItemResponseDto createProgramItem(@PathVariable Long eventId,
+                                                         @RequestBody @Valid EventProgramItemCreateDto dto) {
+        return programService.create(eventId, dto);
+    }
+
+    @PutMapping("/{eventId}/program/{itemId}")
+    public EventProgramItemResponseDto updateProgramItem(@PathVariable Long eventId,
+                                                         @PathVariable Long itemId,
+                                                         @RequestBody @Valid EventProgramItemUpdateDto dto) {
+        return programService.update(eventId, itemId, dto);
+    }
+
+    @DeleteMapping("/{eventId}/program/{itemId}")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    public void deleteProgramItem(@PathVariable Long eventId, @PathVariable Long itemId) {
+        programService.delete(eventId, itemId);
+    }
+
+    @PutMapping("/{eventId}/program/reorder")
+    public List<EventProgramItemResponseDto> reorderProgram(@PathVariable Long eventId,
+                                                            @RequestBody List<Long> itemIds) {
+        return programService.reorder(eventId, itemIds);
     }
 
     @PostMapping("/{parentId}/subevents")

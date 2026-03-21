@@ -5,6 +5,7 @@ export interface User {
   email: string;
   role: string;
   createdAt: string;
+  avatarUrl?: string;
 }
 
 export interface UserCreateDto {
@@ -82,5 +83,48 @@ export interface EventMemberUpsertDto {
 // Типы для ИИ-описания афиши
 export interface PosterDescriptionResponse {
   description: string;
+}
+
+export interface EventTimelineItem {
+  id: number;
+  plannedTime: string;
+  description: string;
+  position: number;
+}
+
+export interface EventTimelineItemCreateDto {
+  plannedTime: string;
+  description: string;
+}
+
+export interface EventTimelineItemUpdateDto {
+  plannedTime: string;
+  description: string;
+}
+
+export interface EventProgramItem {
+  id: number;
+  title: string;
+  artist?: string;
+  plannedTime?: string;
+  durationText?: string;
+  notes?: string;
+  position: number;
+}
+
+export interface EventProgramItemCreateDto {
+  title: string;
+  artist?: string;
+  plannedTime?: string;
+  durationText?: string;
+  notes?: string;
+}
+
+export interface EventProgramItemUpdateDto {
+  title: string;
+  artist?: string;
+  plannedTime?: string;
+  durationText?: string;
+  notes?: string;
 }
 

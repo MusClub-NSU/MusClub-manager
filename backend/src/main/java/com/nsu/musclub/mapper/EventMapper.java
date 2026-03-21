@@ -1,6 +1,7 @@
 package com.nsu.musclub.mapper;
 
 import com.nsu.musclub.domain.Event;
+import com.nsu.musclub.domain.EventStatus;
 import com.nsu.musclub.dto.event.*;
 
 public class EventMapper {
@@ -11,6 +12,7 @@ public class EventMapper {
         event.setStartTime(dto.getStartTime());
         event.setEndTime(dto.getEndTime());
         event.setVenue(dto.getVenue());
+        event.setStatus(dto.getStatus() != null ? dto.getStatus() : EventStatus.NOT_STARTED);
         return event;
     }
 
@@ -20,6 +22,7 @@ public class EventMapper {
         event.setStartTime(dto.getStartTime());
         event.setEndTime(dto.getEndTime());
         event.setVenue(dto.getVenue());
+        event.setStatus(dto.getStatus() != null ? dto.getStatus() : event.getStatus());
     }
 
     public static EventResponseDto toDto(Event event) {
@@ -32,6 +35,7 @@ public class EventMapper {
         dto.setVenue(event.getVenue());
         dto.setCreatedAt(event.getCreatedAt());
         dto.setAiDescription(event.getAiDescription());
+        dto.setStatus(event.getStatus());
         return dto;
     }
 }

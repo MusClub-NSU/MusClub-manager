@@ -2,6 +2,7 @@
 
 import React from 'react';
 import { usePushNotifications } from '@/hooks/usePushNotifications';
+import { useCurrentUserRole } from '@/hooks/useCurrentUserRole';
 
 interface PushNotificationSettingsProps {
   className?: string;
@@ -19,6 +20,7 @@ export function PushNotificationSettings({ className = '' }: PushNotificationSet
     permission,
     sendTestNotification
   } = usePushNotifications();
+  const { canManageEvents } = useCurrentUserRole();
 
   if (!isSupported) {
     return (
@@ -59,7 +61,7 @@ export function PushNotificationSettings({ className = '' }: PushNotificationSet
         </div>
       )}
 
-      {isSubscribed && (
+      {isSubscribed && canManageEvents && (
         <button
           onClick={sendTestNotification}
           className="mt-3 text-sm text-indigo-600 hover:text-indigo-800"

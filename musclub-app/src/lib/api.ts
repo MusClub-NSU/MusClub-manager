@@ -1,7 +1,25 @@
-import { User, UserCreateDto, UserUpdateDto, Event, EventCreateDto, EventUpdateDto, Page, Pageable, EventMember, EventMemberUpsertDto, PosterDescriptionResponse } from '../types/api';
+import { getSession } from 'next-auth/react';
+import {
+  User,
+  UserCreateDto,
+  UserUpdateDto,
+  Event,
+  EventCreateDto,
+  EventUpdateDto,
+  Page,
+  Pageable,
+  EventMember,
+  EventMemberUpsertDto,
+  PosterDescriptionResponse,
+  EventTimelineItem,
+  EventTimelineItemCreateDto,
+  EventTimelineItemUpdateDto,
+  EventProgramItem,
+  EventProgramItemCreateDto,
+  EventProgramItemUpdateDto,
+} from '@/types/api';
 
 // По умолчанию ходим на "/api" (Next.js proxy -> backend через rewrites в next.config.ts).
-// Можно переопределить в рантайме, установив window.ENV_API_URL (например, "https://my-backend.example.com").
 const API_BASE_URL =
   typeof window !== 'undefined'
     ? (window as unknown as { ENV_API_URL?: string }).ENV_API_URL || '/api'
@@ -10,9 +28,18 @@ const API_BASE_URL =
 class ApiClient {
   private async request<T>(endpoint: string, options: RequestInit = {}): Promise<T> {
     const url = `${API_BASE_URL}${endpoint}`;
+
+    // Получаем access token из сессии NextAuth и добавляем в заголовок
+    const session = await getSession();
+    const authHeaders: Record<string, string> = {};
+    if (session?.accessToken) {
+      authHeaders['Authorization'] = `Bearer ${session.accessToken}`;
+    }
+
     const response = await fetch(url, {
       headers: {
         'Content-Type': 'application/json',
+        ...authHeaders,
         ...options.headers,
       },
       ...options,
@@ -45,6 +72,36 @@ class ApiClient {
     }
 
     // Если ответ пустой (например, для DELETE запросов)
+    if (response.status === 204) {
+      return {} as T;
+    }
+
+    return response.json();
+  }
+
+  private async requestWithoutJsonContentType<T>(endpoint: string, options: RequestInit = {}): Promise<T> {
+    const url = `${API_BASE_URL}${endpoint}`;
+    const response = await fetch(url, options);
+
+    if (!response.ok) {
+      let errorMessage = `HTTP error! status: ${response.status}`;
+      try {
+        const errorData = await response.json();
+        if (errorData.message) {
+          errorMessage = errorData.message;
+        }
+      } catch {
+        try {
+          const text = await response.text();
+          if (text) {
+            errorMessage = text;
+          }
+        } catch {
+        }
+      }
+      throw new Error(errorMessage);
+    }
+
     if (response.status === 204) {
       return {} as T;
     }
@@ -86,6 +143,24 @@ class ApiClient {
 
   async deleteUser(id: number): Promise<void> {
     return this.request<void>(`/users/${id}`, {
+      method: 'DELETE',
+    });
+  }
+
+  async uploadUserAvatar(id: number, file: File): Promise<User> {
+    const formData = new FormData();
+    formData.append('file', file);
+    return this.requestWithoutJsonContentType<User>(
+      `/users/${id}/avatar`,
+      {
+        method: 'POST',
+        body: formData,
+      } as RequestInit,
+    );
+  }
+
+  async deleteUserAvatar(id: number): Promise<void> {
+    return this.request<void>(`/users/${id}/avatar`, {
       method: 'DELETE',
     });
   }
@@ -150,6 +225,68 @@ class ApiClient {
   async generatePosterDescription(eventId: number, save: boolean = false): Promise<PosterDescriptionResponse> {
     return this.request<PosterDescriptionResponse>(`/events/${eventId}/poster-description/ai?save=${save}`, {
       method: 'POST',
+    });
+  }
+
+  async getEventTimeline(eventId: number): Promise<EventTimelineItem[]> {
+    return this.request<EventTimelineItem[]>(`/events/${eventId}/timeline`);
+  }
+
+  async createEventTimelineItem(eventId: number, dto: EventTimelineItemCreateDto): Promise<EventTimelineItem> {
+    return this.request<EventTimelineItem>(`/events/${eventId}/timeline`, {
+      method: 'POST',
+      body: JSON.stringify(dto),
+    });
+  }
+
+  async updateEventTimelineItem(eventId: number, itemId: number, dto: EventTimelineItemUpdateDto): Promise<EventTimelineItem> {
+    return this.request<EventTimelineItem>(`/events/${eventId}/timeline/${itemId}`, {
+      method: 'PUT',
+      body: JSON.stringify(dto),
+    });
+  }
+
+  async deleteEventTimelineItem(eventId: number, itemId: number): Promise<void> {
+    return this.request<void>(`/events/${eventId}/timeline/${itemId}`, {
+      method: 'DELETE',
+    });
+  }
+
+  async reorderEventTimeline(eventId: number, itemIds: number[]): Promise<EventTimelineItem[]> {
+    return this.request<EventTimelineItem[]>(`/events/${eventId}/timeline/reorder`, {
+      method: 'PUT',
+      body: JSON.stringify(itemIds),
+    });
+  }
+
+  async getEventProgram(eventId: number): Promise<EventProgramItem[]> {
+    return this.request<EventProgramItem[]>(`/events/${eventId}/program`);
+  }
+
+  async createEventProgramItem(eventId: number, dto: EventProgramItemCreateDto): Promise<EventProgramItem> {
+    return this.request<EventProgramItem>(`/events/${eventId}/program`, {
+      method: 'POST',
+      body: JSON.stringify(dto),
+    });
+  }
+
+  async updateEventProgramItem(eventId: number, itemId: number, dto: EventProgramItemUpdateDto): Promise<EventProgramItem> {
+    return this.request<EventProgramItem>(`/events/${eventId}/program/${itemId}`, {
+      method: 'PUT',
+      body: JSON.stringify(dto),
+    });
+  }
+
+  async deleteEventProgramItem(eventId: number, itemId: number): Promise<void> {
+    return this.request<void>(`/events/${eventId}/program/${itemId}`, {
+      method: 'DELETE',
+    });
+  }
+
+  async reorderEventProgram(eventId: number, itemIds: number[]): Promise<EventProgramItem[]> {
+    return this.request<EventProgramItem[]>(`/events/${eventId}/program/reorder`, {
+      method: 'PUT',
+      body: JSON.stringify(itemIds),
     });
   }
 }

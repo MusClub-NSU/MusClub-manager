@@ -3,20 +3,28 @@
 import { useEffect, useState } from 'react';
 import { useRouter, useParams } from 'next/navigation';
 import { Card, Button, Text, Icon, Loader, Select} from '@gravity-ui/uikit';
-import { Person, LogoTelegram, Calendar, Tags, Pencil } from '@gravity-ui/icons';
-import { useUsers } from '../../../hooks/useApi';
+import { Person, LogoTelegram, Calendar, Tags, Pencil, TrashBin } from '@gravity-ui/icons';
+import { useUsers } from '@/hooks/useApi';
 import { useSidebar } from '../../context/SidebarContext';
 import { PushNotificationSettings } from '../../components/PushNotificationSettings';
+import { apiClient } from '@/lib/api';
+import { useCurrentUserRole } from '@/hooks/useCurrentUserRole';
+import { useSession } from 'next-auth/react';
 
 export default function UserDetailsPage() {
     const params = useParams();
     const router = useRouter();
     const { visible } = useSidebar();
+    const { canManageUsers } = useCurrentUserRole();
+    const { data: session } = useSession();
 
     const userId = Number(params.id);
 
-    const { users, loading, error, updateUser} = useUsers({ page: 0, size: 999 });
+    const { users, loading, error, updateUser, refetch } = useUsers({ page: 0, size: 999 });
     const user = users.find((u) => u.id === userId);
+    const isSelf = !!session?.user?.email && session.user.email === user?.email;
+    const canEditProfile = isSelf || canManageUsers;
+    const canEditAvatar = canEditProfile;
 
     const [isEditing, setIsEditing] = useState(false);
     const [editData, setEditData] = useState({
@@ -56,15 +64,38 @@ export default function UserDetailsPage() {
     }
 
     const handleSave = async () => {
-        await updateUser(user.id, editData);
+        if (!canEditProfile) return;
+        if (canManageUsers) {
+            await updateUser(user.id, editData);
+        } else {
+            await updateUser(user.id, { username: editData.username });
+        }
         setIsEditing(false);
     };
 
-    const handleAvatarChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const handleAvatarChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+        if (!canEditAvatar) return;
         const file = e.target.files?.[0];
         if (!file) return;
         const preview = URL.createObjectURL(file);
         setAvatarPreview(preview);
+        try {
+            await apiClient.uploadUserAvatar(user.id, file);
+            await refetch();
+        } catch (err) {
+            console.error('Ошибка загрузки аватара:', err);
+        }
+    };
+
+    const handleDeleteAvatar = async () => {
+        if (!canEditAvatar) return;
+        try {
+            await apiClient.deleteUserAvatar(user.id);
+            setAvatarPreview(null);
+            await refetch();
+        } catch (err) {
+            console.error('Ошибка удаления аватара:', err);
+        }
     };
 
     return (
@@ -107,9 +138,9 @@ export default function UserDetailsPage() {
 
                         {/* Аватар */}
                         <div className="relative w-32 h-32">
-                            {avatarPreview ? (
+                            {(avatarPreview || user.avatarUrl) ? (
                                 <img
-                                    src={avatarPreview}
+                                    src={avatarPreview || user.avatarUrl}
                                     alt="avatar"
                                     className="w-32 h-32 rounded-full object-cover border"
                                 />
@@ -139,6 +170,18 @@ export default function UserDetailsPage() {
                                             <Icon data={Pencil} size={16}/>
                                         </Button>
                                     </div>
+                                    {(avatarPreview || user.avatarUrl) && (
+                                        <div className="absolute bottom-[-6px] right-[-6px] z-10">
+                                            <Button
+                                                view="flat"
+                                                size="s"
+                                                pin="round-round"
+                                                onClick={handleDeleteAvatar}
+                                            >
+                                                <Icon data={TrashBin} size={14}/>
+                                            </Button>
+                                        </div>
+                                    )}
                                 </>
                             )}
                         </div>
@@ -146,7 +189,7 @@ export default function UserDetailsPage() {
                         {/* Email */}
                         <div className="flex items-center gap-3 w-full">
                             <Icon data={LogoTelegram} size={20} className="shrink-0"/>
-                            {isEditing ? (
+                            {isEditing && canManageUsers ? (
                                 <input
                                     type="email"
                                     value={editData.email}
@@ -155,14 +198,14 @@ export default function UserDetailsPage() {
                                 />
                             ) : (
                                 <button
-                                    onClick={() => navigator.clipboard.writeText(user.email)}
+                                    onClick={() => navigator.clipboard.writeText(user?.email ?? '')}
                                     className="
                 break-words text-lg sm:text-xl font-medium text-left
                 hover:text-[--g-color-text-link] transition
                 cursor-pointer
             "
                                 >
-                                    {user.email}
+                                    {user?.email ?? ''}
                                 </button>
                             )}
                         </div>
@@ -174,7 +217,7 @@ export default function UserDetailsPage() {
                         {/* Роль пользователя */}
                         <div className="flex items-center gap-3 w-full">
                             <Icon data={Person} size={20} className="shrink-0"/>
-                            {isEditing ? (
+                            {isEditing && canManageUsers ? (
                                 <Select
                                     value={[editData.role]}
                                     onUpdate={([value]) => setEditData({...editData, role: value})}
@@ -227,10 +270,12 @@ export default function UserDetailsPage() {
                             Назад
                         </Button>
 
-                        <Button view="outlined" className="min-w-[160px]" size="l" onClick={() => setIsEditing(true)}
-                                disabled={visible}>
-                            Редактировать
-                        </Button>
+                        {canEditProfile && (
+                            <Button view="outlined" className="min-w-[160px]" size="l" onClick={() => setIsEditing(true)}
+                                    disabled={visible}>
+                                Редактировать
+                            </Button>
+                        )}
                     </>
                 )}
             </div>
