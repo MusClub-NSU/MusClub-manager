@@ -3,10 +3,12 @@
 import { useEvents } from '../hooks/useApi';
 import { Card, Text, Loader, Button } from '@gravity-ui/uikit';
 import Link from 'next/link';
-import { signIn, useSession } from 'next-auth/react';
+import { useSession } from 'next-auth/react';
+import { useRouter } from 'next/navigation';
 
 export default function Home() {
     const { data: session } = useSession();
+    const router = useRouter();
     const { events, loading: eventsLoading, error: eventsError } = useEvents({ page: 0, size: 100 });
 
     if (eventsLoading) {
@@ -40,7 +42,7 @@ export default function Home() {
                             view="action"
                             size="m"
                             className="shrink-0"
-                            onClick={() => signIn('keycloak')}
+                            onClick={() => router.push('/login?callbackUrl=/')}
                         >
                             Авторизоваться
                         </Button>
