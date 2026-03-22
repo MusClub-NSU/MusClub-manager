@@ -7,6 +7,7 @@ import com.nsu.musclub.exception.ResourceAlreadyExistsException;
 import com.nsu.musclub.exception.ResourceNotFoundException;
 import com.nsu.musclub.mapper.UserMapper;
 import com.nsu.musclub.repository.UserRepository;
+import com.nsu.musclub.service.SearchIndexingService;
 import com.nsu.musclub.service.UserService;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -22,9 +23,12 @@ public class UserServiceImpl implements UserService {
     private static final long MAX_AVATAR_SIZE_BYTES = 5 * 1024 * 1024;
 
     private final UserRepository users;
+    private final SearchIndexingService searchIndexingService;
 
-    public UserServiceImpl(UserRepository users) {
+    public UserServiceImpl(UserRepository users,
+                           SearchIndexingService searchIndexingService) {
         this.users = users;
+        this.searchIndexingService = searchIndexingService;
     }
 
     @Override
@@ -35,7 +39,9 @@ public class UserServiceImpl implements UserService {
         if (users.existsByEmail(dto.getEmail())) {
             throw new ResourceAlreadyExistsException("Пользователь", "email", dto.getEmail());
         }
-        return UserMapper.toDto(users.save(UserMapper.toEntity(dto)));
+        User created = users.save(UserMapper.toEntity(dto));
+        searchIndexingService.indexUser(created);
+        return UserMapper.toDto(created);
     }
 
     @Override
@@ -79,7 +85,9 @@ public class UserServiceImpl implements UserService {
         }
 
         UserMapper.update(dto, u);
-        return UserMapper.toDto(users.save(u));
+        User updated = users.save(u);
+        searchIndexingService.indexUser(updated);
+        return UserMapper.toDto(updated);
     }
 
     @Override
@@ -106,8 +114,9 @@ public class UserServiceImpl implements UserService {
         }
         user.setAvatarContentType(contentType);
         user.setAvatarFileName(file.getOriginalFilename());
-
-        return UserMapper.toDto(users.save(user));
+        User updated = users.save(user);
+        searchIndexingService.indexUser(updated);
+        return UserMapper.toDto(updated);
     }
 
     @Override
@@ -135,7 +144,8 @@ public class UserServiceImpl implements UserService {
         user.setAvatarData(null);
         user.setAvatarContentType(null);
         user.setAvatarFileName(null);
-        users.save(user);
+        User updated = users.save(user);
+        searchIndexingService.indexUser(updated);
     }
 
     @Override
@@ -144,5 +154,6 @@ public class UserServiceImpl implements UserService {
             throw new ResourceNotFoundException("Пользователь", id);
         }
         users.deleteById(id);
+        searchIndexingService.removeUser(id);
     }
 }

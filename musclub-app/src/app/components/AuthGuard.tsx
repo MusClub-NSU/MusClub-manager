@@ -1,24 +1,43 @@
 'use client';
 
-import { useSession } from 'next-auth/react';
-import { Loader, Text, Button } from '@gravity-ui/uikit';
-import { useEffect } from 'react';
+import { signOut, useSession } from 'next-auth/react';
+import { Loader, Text } from '@gravity-ui/uikit';
+import { useEffect, useRef } from 'react';
 import { usePathname, useRouter } from 'next/navigation';
 
 export default function AuthGuard({ children }: { children: React.ReactNode }) {
     const { data: session, status } = useSession();
     const pathname = usePathname();
     const router = useRouter();
-
-    useEffect(() => {
-        // Если токен истёк с ошибкой — перелогиниваем
-        if (session?.error === 'RefreshAccessTokenError') {
-            router.push(`/login?callbackUrl=${encodeURIComponent(pathname || '/')}`);
-        }
-    }, [session, pathname, router]);
+    const signOutStarted = useRef(false);
 
     // Публичные страницы доступны без авторизации
     const isPublicRoute = pathname === '/' || pathname === '/login';
+
+    useEffect(() => {
+        if (session?.error !== 'RefreshAccessTokenError') {
+            signOutStarted.current = false;
+        }
+    }, [session?.error]);
+
+    useEffect(() => {
+        // Refresh не удался: сессия всё ещё "authenticated", но токен битый.
+        // Нельзя только router.replace на /login — страница входа снова уведёт на главную → бесконечный цикл.
+        // Сбрасываем сессию (cookies) и открываем логин.
+        if (session?.error === 'RefreshAccessTokenError' && !signOutStarted.current) {
+            signOutStarted.current = true;
+            void signOut({
+                callbackUrl: `/login?callbackUrl=${encodeURIComponent(pathname || '/')}`,
+            });
+        }
+    }, [session?.error, pathname]);
+
+    // Гость на закрытой странице — сразу на экран входа (без промежуточного экрана с кнопкой)
+    useEffect(() => {
+        if (status === 'unauthenticated' && !isPublicRoute) {
+            router.replace(`/login?callbackUrl=${encodeURIComponent(pathname || '/')}`);
+        }
+    }, [status, isPublicRoute, pathname, router]);
 
     if (status === 'loading') {
         return (
@@ -34,16 +53,9 @@ export default function AuthGuard({ children }: { children: React.ReactNode }) {
     if (status === 'unauthenticated' && !isPublicRoute) {
         return (
             <div className="flex items-center justify-center min-h-screen">
-                <div className="flex flex-col items-center gap-6 text-center p-8">
-                    <h1 className="text-3xl font-bold">MusClub Manager</h1>
-                    <Text color="secondary">Для доступа к приложению необходимо войти в систему</Text>
-                    <Button
-                        view="action"
-                        size="l"
-                        onClick={() => router.push(`/login?callbackUrl=${encodeURIComponent(pathname || '/')}`)}
-                    >
-                        Войти
-                    </Button>
+                <div className="flex flex-col items-center gap-4">
+                    <Loader size="l" />
+                    <Text color="secondary">Переход к авторизации…</Text>
                 </div>
             </div>
         );

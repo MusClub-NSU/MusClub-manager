@@ -1,14 +1,14 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { signIn, useSession } from 'next-auth/react';
+import { signIn, signOut, useSession } from 'next-auth/react';
 import { Button, Card, Loader, Text } from '@gravity-ui/uikit';
 
 export default function LoginPage() {
     const router = useRouter();
     const searchParams = useSearchParams();
-    const { status } = useSession();
+    const { status, data: session } = useSession();
 
     const [username, setUsername] = useState('');
     const [password, setPassword] = useState('');
@@ -17,10 +17,16 @@ export default function LoginPage() {
 
     const callbackUrl = searchParams.get('callbackUrl') || '/';
 
-    if (status === 'authenticated') {
+    // Переносим навигацию в useEffect, чтобы не вызывать router во время render
+    useEffect(() => {
+        if (status !== 'authenticated') return;
+        // Иначе цикл: login → главная → снова login при битом refresh
+        if (session?.error === 'RefreshAccessTokenError') {
+            void signOut({ redirect: false });
+            return;
+        }
         router.replace(callbackUrl);
-        return null;
-    }
+    }, [status, session?.error, callbackUrl, router]);
 
     const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
         e.preventDefault();
@@ -43,6 +49,30 @@ export default function LoginPage() {
 
         router.push(result.url || callbackUrl);
     };
+
+    // Во время проверки сессии показываем загрузку
+    if (status === 'loading') {
+        return (
+            <main className="flex min-h-screen items-center justify-center p-4">
+                <div className="flex flex-col items-center gap-4">
+                    <Loader size="l" />
+                    <Text>Проверка сессии...</Text>
+                </div>
+            </main>
+        );
+    }
+
+    // Если уже аутентифицирован, редиректится через useEffect выше
+    if (status === 'authenticated') {
+        return (
+            <main className="flex min-h-screen items-center justify-center p-4">
+                <div className="flex flex-col items-center gap-4">
+                    <Loader size="l" />
+                    <Text>Перенаправляем...</Text>
+                </div>
+            </main>
+        );
+    }
 
     return (
         <main className="flex min-h-screen items-center justify-center p-4">
