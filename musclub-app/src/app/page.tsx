@@ -74,7 +74,11 @@ export default function Home() {
                                 <div key={event.id} className="py-4 flex items-start justify-between gap-4">
                                     <div className="min-w-0">
                                         <Link
-                                            href={`/events/${event.id}`}
+                                            href={
+                                                session
+                                                    ? `/events/${event.id}`
+                                                    : `/login?callbackUrl=${encodeURIComponent(`/events/${event.id}`)}`
+                                            }
                                             className="font-semibold hover:underline block truncate"
                                             title={event.title}
                                         >

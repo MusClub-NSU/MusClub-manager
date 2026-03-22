@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState, useEffect, useCallback } from 'react';
+import { useSession } from 'next-auth/react';
 import { apiClient } from '../lib/api';
 import { User, Event, Pageable, SearchEntityType, SearchResult } from '../types/api';
 
@@ -21,13 +22,14 @@ function sortEventsByStartTimeDesc(events: Event[]): Event[] {
 
 // Хук для работы с пользователями
 export function useUsers(pageable?: Pageable) {
+  const { status } = useSession();
   const [users, setUsers] = useState<User[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [totalElements, setTotalElements] = useState(0);
   const [totalPages, setTotalPages] = useState(0);
 
-  const fetchUsers = async () => {
+  const fetchUsers = useCallback(async () => {
     try {
       setLoading(true);
       setError(null);
@@ -40,11 +42,14 @@ export function useUsers(pageable?: Pageable) {
     } finally {
       setLoading(false);
     }
-  };
-
-  useEffect(() => {
-    fetchUsers();
   }, [pageable?.page, pageable?.size, pageable?.sort]);
+
+  // После входа сессия появляется с задержкой — без повторного запроса список
+  // остаётся пустым и «Перейти в профиль» ведёт на /participants вместо /participants/:id
+  useEffect(() => {
+    if (status === 'loading') return;
+    void fetchUsers();
+  }, [fetchUsers, status]);
 
   const createUser = async (userData: { username: string; email: string; role: string }) => {
     try {
