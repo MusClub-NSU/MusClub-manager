@@ -24,8 +24,11 @@ export function PushNotificationSettings({ className = '' }: PushNotificationSet
 
   if (!isSupported) {
     return (
-      <div className={`p-4 bg-gray-100 rounded-lg ${className}`}>
-        <p className="text-gray-500 text-sm">
+      <div
+        className={`p-4 rounded-lg ${className}`}
+        style={{ backgroundColor: 'var(--color-background-secondary)', border: '1px solid var(--color-line-generic)' }}
+      >
+        <p className="text-sm" style={{ color: 'var(--color-text-secondary)' }}>
           Push-уведомления не поддерживаются в вашем браузере
         </p>
       </div>
@@ -33,12 +36,18 @@ export function PushNotificationSettings({ className = '' }: PushNotificationSet
   }
 
   return (
-    <div className={`p-4 bg-white rounded-lg shadow ${className}`}>
+    <div
+      className={`p-4 rounded-lg shadow-sm ${className}`}
+      style={{
+        backgroundColor: 'var(--color-background-secondary)',
+        border: '1px solid var(--color-line-generic)',
+      }}
+    >
       <div>
-        <h3 className="text-lg font-medium text-gray-900">
+        <h3 className="text-lg font-medium" style={{ color: 'var(--color-text-primary)' }}>
           Push-уведомления
         </h3>
-        <p className="text-sm text-gray-500">
+        <p className="text-sm" style={{ color: 'var(--color-text-secondary)' }}>
           {isLoading
             ? 'Подписка на уведомления...'
             : isSubscribed
@@ -49,14 +58,14 @@ export function PushNotificationSettings({ className = '' }: PushNotificationSet
 
       {/* Статус разрешения */}
       {permission === 'denied' && (
-        <div className="mt-3 p-2 bg-red-50 rounded text-sm text-red-600">
+        <div className="mt-3 p-2 rounded text-sm" style={{ backgroundColor: 'rgba(220, 38, 38, 0.12)', color: '#dc2626' }}>
           Уведомления заблокированы в настройках браузера.
           Разрешите их в настройках сайта.
         </div>
       )}
 
       {error && (
-        <div className="mt-3 p-2 bg-red-50 rounded text-sm text-red-600">
+        <div className="mt-3 p-2 rounded text-sm" style={{ backgroundColor: 'rgba(220, 38, 38, 0.12)', color: '#dc2626' }}>
           {error}
         </div>
       )}
@@ -64,7 +73,8 @@ export function PushNotificationSettings({ className = '' }: PushNotificationSet
       {isSubscribed && canManageEvents && (
         <button
           onClick={sendTestNotification}
-          className="mt-3 text-sm text-indigo-600 hover:text-indigo-800"
+          className="mt-3 text-sm hover:opacity-80"
+          style={{ color: 'rgb(79, 70, 229)' }}
         >
           Отправить тестовое уведомление
         </button>

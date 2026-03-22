@@ -128,3 +128,15 @@ export interface EventProgramItemUpdateDto {
   notes?: string;
 }
 
+export type SearchEntityType = 'EVENT' | 'USER';
+
+export interface SearchResult {
+  entityType: SearchEntityType;
+  entityId: number;
+  title: string;
+  snippet: string;
+  score: number;
+  lexicalScore: number;
+  vectorScore: number;
+}
+

@@ -1,8 +1,8 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { apiClient } from '../lib/api';
-import { User, Event, Pageable } from '../types/api';
+import { User, Event, Pageable, SearchEntityType, SearchResult } from '../types/api';
 
 function sortEventsByStartTimeDesc(events: Event[]): Event[] {
   return [...events].sort((a, b) => {
@@ -172,6 +172,43 @@ export function useEvents(pageable?: Pageable) {
     updateEvent,
     deleteEvent,
     refetch: fetchEvents,
+  };
+}
+
+export function useHybridSearch() {
+  const [results, setResults] = useState<SearchResult[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const search = useCallback(async (
+    query: string,
+    types: SearchEntityType[] = ['EVENT', 'USER'],
+    pageable: Pageable = { page: 0, size: 20 },
+  ) => {
+    if (!query.trim()) {
+      setResults([]);
+      setError(null);
+      return;
+    }
+
+    try {
+      setLoading(true);
+      setError(null);
+      const response = await apiClient.hybridSearch(query.trim(), types, pageable);
+      setResults(response.content);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Ошибка поиска');
+      setResults([]);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  return {
+    results,
+    loading,
+    error,
+    search,
   };
 }
 
