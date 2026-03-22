@@ -33,6 +33,16 @@
 * Структурированные JSON-ответы с кодами ошибок
 * Валидация входных данных с детальными сообщениями
 
+### 🔎 Гибридный поиск (FTS + Vector)
+
+* Добавлен API гибридного поиска `/api/search/hybrid`.
+* Поиск работает сразу по двум сущностям: `EVENT` и `USER`.
+* Используется комбинация:
+  * лексического ранжирования PostgreSQL Full-Text Search (`tsvector`, `ts_rank_cd`),
+  * векторной близости через `pgvector`.
+* Индекс поиска обновляется автоматически при создании/редактировании/удалении событий и пользователей.
+* Для быстрого старта используется детерминированный локальный embedder (без внешнего API), что делает поиск стабильным в dev/test окружении.
+
 ---
 
 ## 🧭 Зачем это нужно клубу
@@ -62,6 +72,7 @@ MusClub Manager переводит процесс в единый поток:
 * **Backend:** Java 17+ / Spring Boot 3.3 / Gradle
 * **Frontend:** Next.js / React / TypeScript / PWA
 * **Database:** PostgreSQL + Flyway migrations
+* **Search:** PostgreSQL FTS + pgvector
 * **Notifications:** Web Push API (VAPID)
 * **API Docs:** OpenAPI / Swagger
 
@@ -87,6 +98,21 @@ push:
   scheduler-interval: 30000
   default-reminder-intervals: 1440, 120, 15  # минуты: 24ч, 2ч, 15мин
 ```
+
+---
+
+## 🔧 Конфигурация гибридного поиска
+
+```yaml
+search:
+  embedding-dimensions: 256
+  hybrid:
+    lexical-weight: 0.65
+    vector-weight: 0.35
+    min-vector-score: 0.15
+```
+
+Для локального запуска рекомендуется образ PostgreSQL с поддержкой `pgvector` (в проекте уже настроен `pgvector/pgvector:pg16`).
 
 ---
 
