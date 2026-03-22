@@ -7,6 +7,7 @@ import com.nsu.musclub.exception.ResourceNotFoundException;
 import com.nsu.musclub.mapper.EventMapper;
 import com.nsu.musclub.repository.EventRepository;
 import com.nsu.musclub.service.EventService;
+import com.nsu.musclub.service.SearchIndexingService;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
@@ -20,15 +21,20 @@ import java.time.OffsetDateTime;
 @Transactional
 public class EventServiceImpl implements EventService {
     private final EventRepository events;
+    private final SearchIndexingService searchIndexingService;
 
-    public EventServiceImpl(EventRepository events) {
+    public EventServiceImpl(EventRepository events,
+                            SearchIndexingService searchIndexingService) {
         this.events = events;
+        this.searchIndexingService = searchIndexingService;
     }
 
     @Override
     public EventResponseDto create(EventCreateDto dto) {
         validateEventTimes(dto.getStartTime(), dto.getEndTime());
-        return EventMapper.toDto(events.save(EventMapper.toEntity(dto)));
+        Event created = events.save(EventMapper.toEntity(dto));
+        searchIndexingService.indexEvent(created);
+        return EventMapper.toDto(created);
     }
 
     @Override
@@ -61,7 +67,9 @@ public class EventServiceImpl implements EventService {
                 .orElseThrow(() -> new ResourceNotFoundException("Мероприятие", id));
         validateEventTimes(dto.getStartTime(), dto.getEndTime());
         EventMapper.update(dto, event);
-        return EventMapper.toDto(events.save(event));
+        Event updated = events.save(event);
+        searchIndexingService.indexEvent(updated);
+        return EventMapper.toDto(updated);
     }
 
     @Override
@@ -70,6 +78,7 @@ public class EventServiceImpl implements EventService {
             throw new ResourceNotFoundException("Мероприятие", id);
         }
         events.deleteById(id);
+        searchIndexingService.removeEvent(id);
     }
 
     private void validateEventTimes(OffsetDateTime startTime, OffsetDateTime endTime) {
