@@ -54,3 +54,11 @@ deepseek:
   api-url: https://api.deepseek.com/v1/chat/completions
   api-key: ${DEEPSEEK_API_KEY:test-api-key-for-testing-only}
   model: deepseek-chat
+
+search:
+  embedding-dimensions: ${SEARCH_EMBEDDING_DIMENSIONS:256}
+  hybrid:
+    lexical-weight: ${SEARCH_HYBRID_LEXICAL_WEIGHT:0.5}
+    vector-weight: ${SEARCH_HYBRID_VECTOR_WEIGHT:0.5}
+    min-vector-score: ${SEARCH_HYBRID_MIN_VECTOR_SCORE:0.1}
+

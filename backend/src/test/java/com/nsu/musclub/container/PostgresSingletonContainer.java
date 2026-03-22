@@ -8,7 +8,7 @@ import org.testcontainers.utility.DockerImageName;
  */
 public final class PostgresSingletonContainer extends PostgreSQLContainer<PostgresSingletonContainer> {
 
-    private static final DockerImageName IMAGE = DockerImageName.parse("postgres:16");
+    private static final DockerImageName IMAGE = DockerImageName.parse("pgvector/pgvector:pg16");
 
     private static PostgresSingletonContainer container;
 
