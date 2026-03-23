@@ -50,6 +50,16 @@ logging:
     org.springframework.web: INFO
     org.hibernate.SQL: DEBUG
 
+keycloak:
+  # Для запуска backend локально (bootRun) Keycloak доступен как localhost:8180.
+  # Для запуска в docker Compose backend нужно явно задать KEYCLOAK_BASE_URL=http://keycloak:8180.
+  base-url: ${KEYCLOAK_BASE_URL:http://localhost:8180}
+  realm: ${KEYCLOAK_REALM:musclub}
+  admin:
+    client-id: ${KEYCLOAK_ADMIN_CLIENT_ID:admin-cli}
+    username: ${KEYCLOAK_ADMIN_USERNAME:admin}
+    password: ${KEYCLOAK_ADMIN_PASSWORD:admin}
+
 deepseek:
   api-url: https://api.deepseek.com/v1/chat/completions
   api-key: ${DEEPSEEK_API_KEY:test-api-key-for-testing-only}

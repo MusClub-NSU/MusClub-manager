@@ -233,10 +233,15 @@ export default function EventsPage() {
                     const event = isSearchItem ? null : (item as Event);
                     const result = isSearchItem ? (item as SearchResult) : null;
                     const eventId = isSearchItem ? result.entityId : event!.id;
-                    const title = isSearchItem ? result.title : event!.title;
-                    const description = isSearchItem ? result.snippet : event!.description;
-                    const startTime = isSearchItem ? null : event!.startTime;
+                    const matchedEvent = isSearchItem ? events.find((e) => e.id === result.entityId) : null;
+
+                    const title = isSearchItem ? (matchedEvent?.title ?? result.title) : event!.title;
+                    const description = isSearchItem
+                        ? (matchedEvent?.description ?? result.snippet)
+                        : event!.description;
+                    const startTime = isSearchItem ? (matchedEvent?.startTime ?? null) : event!.startTime;
                     const dateTime = startTime ? formatDateTime(startTime) : null;
+                    const venue = isSearchItem ? matchedEvent?.venue : event?.venue;
 
                     return (
                         <Card
@@ -263,10 +268,10 @@ export default function EventsPage() {
                             )}
 
                             {/* Локация */}
-                            {event?.venue && (
+                            {venue && (
                                 <div className="flex items-center gap-2 text-base md:text-lg">
                                     <Icon data={HandPointRight} size={18} />
-                                    <span>{event.venue}</span>
+                                    <span>{venue}</span>
                                 </div>
                             )}
 
@@ -282,16 +287,22 @@ export default function EventsPage() {
                                         <Button
                                             view="flat"
                                             size="s"
-                                            onClick={() => !isSearchItem && handleEditEvent(event!)}
-                                            disabled={visible || isSearchItem}
+                                            onClick={() => {
+                                                const target = isSearchItem ? matchedEvent : event;
+                                                if (target) handleEditEvent(target);
+                                            }}
+                                            disabled={visible || (isSearchItem && !matchedEvent)}
                                         >
                                             <Icon data={Pencil} size={14} />
                                         </Button>
                                         <Button
                                             view="flat"
                                             size="s"
-                                            onClick={() => !isSearchItem && handleDeleteEvent(event!.id)}
-                                            disabled={visible || isSearchItem}
+                                            onClick={() => {
+                                                const target = isSearchItem ? matchedEvent : event;
+                                                if (target) handleDeleteEvent(target.id);
+                                            }}
+                                            disabled={visible || (isSearchItem && !matchedEvent)}
                                         >
                                             <Icon data={TrashBin} size={14} />
                                         </Button>

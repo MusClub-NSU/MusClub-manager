@@ -51,7 +51,7 @@ export function useUsers(pageable?: Pageable) {
     void fetchUsers();
   }, [fetchUsers, status]);
 
-  const createUser = async (userData: { username: string; email: string; role: string }) => {
+  const createUser = async (userData: { username: string; email: string; role: string; password: string }) => {
     try {
       const newUser = await apiClient.createUser(userData);
       setUsers(prev => [newUser, ...prev]);

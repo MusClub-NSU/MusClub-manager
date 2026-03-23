@@ -6,9 +6,11 @@ import { Plus, Pencil, TrashBin, Xmark } from '@gravity-ui/icons';
 import { useEffect, useState } from 'react';
 import { User } from '../../types/api';
 import { useSidebar } from '../context/SidebarContext';
+import { useCurrentUserRole } from '@/hooks/useCurrentUserRole';
 
 export default function ParticipantsPage() {
     const { visible: sidebarVisible } = useSidebar();
+    const { canManageUsers } = useCurrentUserRole();
     const { users, loading, error, createUser, updateUser, deleteUser, refetch } = useUsers({ page: 0, size: 20 });
     const { results: searchResults, loading: searchLoading, error: searchError, search } = useHybridSearch();
     const [searchQuery, setSearchQuery] = useState('');
@@ -17,7 +19,8 @@ export default function ParticipantsPage() {
     const [createFormData, setCreateFormData] = useState({
         username: '',
         email: '',
-        role: 'MEMBER'
+        role: 'MEMBER',
+        password: '',
     });
     const [editingUser, setEditingUser] = useState<User | null>(null);
     const [editFormData, setEditFormData] = useState({
@@ -36,10 +39,12 @@ export default function ParticipantsPage() {
     }, [searchQuery, search]);
 
     const handleCreateUser = () => {
+        if (!canManageUsers) return;
         setCreateFormData({
             username: '',
             email: '',
-            role: 'MEMBER'
+            role: 'MEMBER',
+            password: '',
         });
         setIsCreateModalOpen(true);
     };
@@ -49,8 +54,9 @@ export default function ParticipantsPage() {
     };
 
     const handleSaveCreate = async () => {
-        if (!createFormData.username.trim() || !createFormData.email.trim()) {
-            alert('Заполните имя и email');
+        if (!canManageUsers) return;
+        if (!createFormData.username.trim() || !createFormData.email.trim() || !createFormData.password.trim()) {
+            alert('Заполните имя, email и пароль');
             return;
         }
 
@@ -59,7 +65,8 @@ export default function ParticipantsPage() {
             await createUser({
                 username: createFormData.username.trim(),
                 email: createFormData.email.trim(),
-                role: createFormData.role
+                role: createFormData.role,
+                password: createFormData.password,
             });
             await refetch();
             handleCloseCreate();
@@ -73,6 +80,7 @@ export default function ParticipantsPage() {
     };
 
     const handleDeleteUser = async (id: number) => {
+        if (!canManageUsers) return;
         if (confirm('Вы уверены, что хотите удалить этого участника?')) {
             try {
                 await deleteUser(id);
@@ -83,6 +91,7 @@ export default function ParticipantsPage() {
     };
 
     const handleEditUser = (user: User) => {
+        if (!canManageUsers) return;
         setEditingUser(user);
         setEditFormData({
             username: user.username,
@@ -96,6 +105,7 @@ export default function ParticipantsPage() {
     };
 
     const handleSaveEdit = async () => {
+        if (!canManageUsers) return;
         if (!editingUser) return;
 
         try {
@@ -150,18 +160,20 @@ export default function ParticipantsPage() {
                             Участники
                         </h1>
                     </div>
-                    <Button
-                        view="action"
-                        onClick={handleCreateUser}
-                        disabled={isCreating || sidebarVisible}
-                        size="l"
-                        className="px-6 py-3 bg-gradient-to-r from-blue-600 to-blue-500 hover:from-blue-700 hover:to-blue-600 text-white font-semibold shadow-lg hover:shadow-xl transition-all duration-200"
-                    >
-                        <span className="flex items-center justify-center gap-2">
-                            <Icon data={Plus} size={18} />
-                            <span>Добавить участника</span>
-                        </span>
-                    </Button>
+                    {canManageUsers && (
+                        <Button
+                            view="action"
+                            onClick={handleCreateUser}
+                            disabled={isCreating || sidebarVisible}
+                            size="l"
+                            className="px-6 py-3 bg-gradient-to-r from-blue-600 to-blue-500 hover:from-blue-700 hover:to-blue-600 text-white font-semibold shadow-lg hover:shadow-xl transition-all duration-200"
+                        >
+                            <span className="flex items-center justify-center gap-2">
+                                <Icon data={Plus} size={18} />
+                                <span>Добавить участника</span>
+                            </span>
+                        </Button>
+                    )}
                 </div>
 
                 {/* Поиск с красивым дизайном */}
@@ -268,45 +280,77 @@ export default function ParticipantsPage() {
                                         {searchQuery.trim() ? (
                                             searchResults
                                                 .filter((result) => result.entityType === 'USER' && (result.score || 0) > 0.05)
-                                                .map((result) => (
-                                                    <tr 
-                                                        key={result.entityId} 
-                                                        className="hover:opacity-80 transition-opacity duration-200 group"
-                                                    >
+                                                .map((result) => {
+                                                    const user = users.find((u) => u.id === result.entityId);
+                                                    return (
+                                                        <tr
+                                                            key={result.entityId}
+                                                            className="hover:opacity-80 transition-opacity duration-200 group"
+                                                        >
                                                         <td className="px-6 py-4">
                                                             <Link
                                                                 view="normal"
                                                                 href={`/participants/${result.entityId}`}
                                                                 className="font-medium hover:text-blue-500 transition-colors"
                                                             >
-                                                                <span className="group-hover:underline">{result.title}</span>
+                                                                <span className="group-hover:underline">
+                                                                    {user?.username ?? result.title}
+                                                                </span>
                                                             </Link>
                                                         </td>
-                                                        <td className="px-6 py-4 font-mono text-sm opacity-70">{result.snippet || 'Не указано'}</td>
-                                                        <td className="px-6 py-4 text-sm opacity-70">-</td>
-                                                        <td className="px-6 py-4 opacity-70">-</td>
+                                                        <td className="px-6 py-4 font-mono text-sm opacity-70">
+                                                            {user?.email ?? result.snippet ?? 'Не указано'}
+                                                        </td>
+                                                        <td className="px-6 py-4">
+                                                            {user?.role === 'ORGANIZER' ? (
+                                                                <span className="inline-flex items-center px-3 py-1.5 rounded-full text-xs font-semibold bg-blue-100 text-blue-700">
+                                                                    Организатор
+                                                                </span>
+                                                            ) : user?.role === 'MEMBER' ? (
+                                                                <span className="inline-flex items-center px-3 py-1.5 rounded-full text-xs font-semibold bg-gray-100 text-gray-700">
+                                                                    Участник
+                                                                </span>
+                                                            ) : (
+                                                                <span className="text-sm opacity-70">-</span>
+                                                            )}
+                                                        </td>
+                                                        <td className="px-6 py-4 text-sm opacity-70">
+                                                            {user?.createdAt
+                                                                ? new Date(user.createdAt).toLocaleDateString('ru-RU', {
+                                                                    year: 'numeric',
+                                                                    month: 'short',
+                                                                    day: 'numeric',
+                                                                })
+                                                                : '-'}
+                                                        </td>
                                                         <td className="px-6 py-4 text-right">
                                                             <div className="flex justify-end gap-2 opacity-100">
-                                                                <Button
-                                                                    view="flat"
-                                                                    size="s"
-                                                                    disabled={true}
-                                                                    title="Редактирование результатов поиска недоступно"
-                                                                >
-                                                                    <Icon data={Pencil} size={16} />
-                                                                </Button>
-                                                                <Button
-                                                                    view="flat"
-                                                                    size="s"
-                                                                    disabled={true}
-                                                                    title="Удаление результатов поиска недоступно"
-                                                                >
-                                                                    <Icon data={TrashBin} size={16} />
-                                                                </Button>
+                                                                {canManageUsers ? (
+                                                                    <>
+                                                                        <Button
+                                                                            view="flat"
+                                                                            size="s"
+                                                                            onClick={() => user && handleEditUser(user)}
+                                                                            disabled={sidebarVisible || !user}
+                                                                            title={!user ? 'Данные пользователя не найдены в текущей выборке' : undefined}
+                                                                        >
+                                                                            <Icon data={Pencil} size={16} />
+                                                                        </Button>
+                                                                        <Button
+                                                                            view="flat"
+                                                                            size="s"
+                                                                            onClick={() => handleDeleteUser(result.entityId)}
+                                                                            disabled={sidebarVisible}
+                                                                        >
+                                                                            <Icon data={TrashBin} size={16} />
+                                                                        </Button>
+                                                                    </>
+                                                                ) : null}
                                                             </div>
                                                         </td>
                                                     </tr>
-                                                ))
+                                                    );
+                                                })
                                         ) : (
                                             users.map((user) => (
                                                 <tr 
@@ -343,22 +387,26 @@ export default function ParticipantsPage() {
                                                     </td>
                                                     <td className="px-6 py-4 text-right">
                                                         <div className="flex justify-end gap-2 opacity-100">
-                                                            <Button
-                                                                view="flat"
-                                                                size="s"
-                                                                onClick={() => handleEditUser(user)}
-                                                                disabled={sidebarVisible}
-                                                            >
-                                                                <Icon data={Pencil} size={16} />
-                                                            </Button>
-                                                            <Button
-                                                                view="flat"
-                                                                size="s"
-                                                                onClick={() => handleDeleteUser(user.id)}
-                                                                disabled={sidebarVisible}
-                                                            >
-                                                                <Icon data={TrashBin} size={16} />
-                                                            </Button>
+                                                            {canManageUsers ? (
+                                                                <>
+                                                                    <Button
+                                                                        view="flat"
+                                                                        size="s"
+                                                                        onClick={() => handleEditUser(user)}
+                                                                        disabled={sidebarVisible}
+                                                                    >
+                                                                        <Icon data={Pencil} size={16} />
+                                                                    </Button>
+                                                                    <Button
+                                                                        view="flat"
+                                                                        size="s"
+                                                                        onClick={() => handleDeleteUser(user.id)}
+                                                                        disabled={sidebarVisible}
+                                                                    >
+                                                                        <Icon data={TrashBin} size={16} />
+                                                                    </Button>
+                                                                </>
+                                                            ) : null}
                                                         </div>
                                                     </td>
                                                 </tr>
@@ -372,7 +420,7 @@ export default function ParticipantsPage() {
                 )}
             </div>
 
-            {isCreateModalOpen && (
+            {isCreateModalOpen && canManageUsers && (
                 <div
                     className="fixed inset-0 flex items-center justify-center bg-background/70 backdrop-blur-sm z-50 px-6"
                     onClick={handleCloseCreate}
@@ -422,6 +470,19 @@ export default function ParticipantsPage() {
 
                                 <div className="group">
                                     <label className="block text-sm font-medium mb-2">
+                                        Пароль <span className="text-red-500">*</span>
+                                    </label>
+                                    <input
+                                        type="password"
+                                        value={createFormData.password}
+                                        onChange={(e) => setCreateFormData({ ...createFormData, password: e.target.value })}
+                                        className="w-full px-4 py-2 border border-[--foreground]/20 rounded-lg bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                        required
+                                    />
+                                </div>
+
+                                <div className="group">
+                                    <label className="block text-sm font-medium mb-2">
                                         Роль <span className="text-red-500">*</span>
                                     </label>
                                     <select
@@ -457,7 +518,7 @@ export default function ParticipantsPage() {
             )}
 
             {/* Модальное окно редактирования */}
-            {editingUser && (
+            {editingUser && canManageUsers && (
                 <div
                     className="fixed inset-0 flex items-center justify-center bg-background/70 backdrop-blur-sm z-50 px-6"
                     onClick={handleCloseEdit}

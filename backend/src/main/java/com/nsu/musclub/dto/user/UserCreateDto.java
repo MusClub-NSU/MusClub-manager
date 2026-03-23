@@ -16,6 +16,10 @@ public class UserCreateDto {
     @Size(max = 50)
     private String role = "MEMBER";
 
+    @NotBlank
+    @Size(max = 255)
+    private String password;
+
     public String getUsername() {
         return username;
     }
@@ -38,5 +42,13 @@ public class UserCreateDto {
 
     public void setRole(String role) {
         this.role = role;
+    }
+
+    public String getPassword() {
+        return password;
+    }
+
+    public void setPassword(String password) {
+        this.password = password;
     }
 }

@@ -53,6 +53,7 @@ services:
       SPRING_DATASOURCE_USERNAME: musclub
       SPRING_DATASOURCE_PASSWORD: musclub
       KEYCLOAK_ISSUER_URI: http://keycloak:8180/realms/musclub
+      KEYCLOAK_BASE_URL: http://keycloak:8180
       VAPID_PUBLIC_KEY: BLrkc-3gcvpo4V6OkpBm1X9qsQ_O8qYVERu8F6ybBKX_FAmFooYJ-Dj-1oS7BT9W4bLKLOYESYc-hQiSHAphYjE
       VAPID_PRIVATE_KEY: HWOmlHHey5cQt0d6vNbS-X-gF4jb1h28mr8sAq7d1FY
     ports:

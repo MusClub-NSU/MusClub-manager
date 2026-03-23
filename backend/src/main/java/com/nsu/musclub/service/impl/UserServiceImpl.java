@@ -8,6 +8,7 @@ import com.nsu.musclub.exception.ResourceNotFoundException;
 import com.nsu.musclub.mapper.UserMapper;
 import com.nsu.musclub.repository.UserRepository;
 import com.nsu.musclub.service.SearchIndexingService;
+import com.nsu.musclub.service.KeycloakUserProvisioningService;
 import com.nsu.musclub.service.UserService;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -24,11 +25,14 @@ public class UserServiceImpl implements UserService {
 
     private final UserRepository users;
     private final SearchIndexingService searchIndexingService;
+    private final KeycloakUserProvisioningService keycloakUserProvisioningService;
 
     public UserServiceImpl(UserRepository users,
-                           SearchIndexingService searchIndexingService) {
+                           SearchIndexingService searchIndexingService,
+                           KeycloakUserProvisioningService keycloakUserProvisioningService) {
         this.users = users;
         this.searchIndexingService = searchIndexingService;
+        this.keycloakUserProvisioningService = keycloakUserProvisioningService;
     }
 
     @Override
@@ -39,9 +43,19 @@ public class UserServiceImpl implements UserService {
         if (users.existsByEmail(dto.getEmail())) {
             throw new ResourceAlreadyExistsException("Пользователь", "email", dto.getEmail());
         }
-        User created = users.save(UserMapper.toEntity(dto));
-        searchIndexingService.indexUser(created);
-        return UserMapper.toDto(created);
+
+        // 1) Provision user in Keycloak
+        String keycloakUserId = keycloakUserProvisioningService.createUserAndAssignRole(dto);
+
+        // 2) Save user in our DB (rollback best-effort if something fails)
+        try {
+            User created = users.save(UserMapper.toEntity(dto));
+            searchIndexingService.indexUser(created);
+            return UserMapper.toDto(created);
+        } catch (RuntimeException ex) {
+            keycloakUserProvisioningService.deleteUserQuietly(keycloakUserId);
+            throw ex;
+        }
     }
 
     @Override
