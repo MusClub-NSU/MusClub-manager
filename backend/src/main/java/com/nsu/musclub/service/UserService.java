@@ -14,6 +14,8 @@ public interface UserService {
 
     UserResponseDto update(Long id, UserUpdateDto dto);
 
+    void updatePassword(Long id, UserPasswordUpdateDto dto);
+
     UserResponseDto uploadAvatar(Long id, MultipartFile file);
 
     UserAvatarDto getAvatar(Long id);

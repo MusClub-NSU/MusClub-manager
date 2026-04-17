@@ -5,6 +5,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.nsu.musclub.dto.user.UserCreateDto;
+import com.nsu.musclub.exception.BadRequestException;
 import com.nsu.musclub.exception.ResourceAlreadyExistsException;
 import com.nsu.musclub.service.KeycloakUserProvisioningService;
 import org.springframework.beans.factory.annotation.Value;
@@ -19,9 +20,11 @@ import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.nio.charset.StandardCharsets;
+import java.util.Set;
 
 @Service
 public class KeycloakUserProvisioningServiceImpl implements KeycloakUserProvisioningService {
+    private static final Set<String> MANAGED_REALM_ROLES = Set.of("MEMBER", "ORGANIZER");
     private final HttpClient httpClient;
     private final ObjectMapper objectMapper;
 
@@ -124,6 +127,55 @@ public class KeycloakUserProvisioningServiceImpl implements KeycloakUserProvisio
         } catch (Exception ignored) {
             // best effort rollback
         }
+    }
+
+    @Override
+    public void deleteUserByProfileQuietly(String email, String username) {
+        try {
+            String accessToken = getAdminAccessToken();
+            String userId = findUserIdByEmailOrUsername(accessToken, email, username);
+            if (userId != null && !userId.isBlank()) {
+                deleteUserQuietly(userId);
+            }
+        } catch (Exception ignored) {
+            // best effort delete sync
+        }
+    }
+
+    @Override
+    public void updateUserProfile(String oldEmail, String oldUsername, String newUsername, String newEmail, String role, String password) {
+        String accessToken = getAdminAccessToken();
+        String userId;
+        try {
+            userId = findUserIdByEmailOrUsername(accessToken, oldEmail, oldUsername);
+        } catch (IOException | InterruptedException e) {
+            Thread.currentThread().interrupt();
+            throw new RuntimeException("Keycloak user lookup failed", e);
+        }
+        if (userId == null || userId.isBlank()) {
+            return;
+        }
+
+        updateBasicProfile(accessToken, userId, newUsername, newEmail);
+        syncRealmRole(accessToken, userId, role);
+        if (password != null && !password.isBlank()) {
+            resetPassword(accessToken, userId, password);
+        }
+    }
+
+    @Override
+    public void resetPasswordByProfile(String email, String username, String password) {
+        if (password == null || password.isBlank()) return;
+        String accessToken = getAdminAccessToken();
+        String userId;
+        try {
+            userId = findUserIdByEmailOrUsername(accessToken, email, username);
+        } catch (IOException | InterruptedException e) {
+            Thread.currentThread().interrupt();
+            throw new RuntimeException("Keycloak user lookup failed", e);
+        }
+        if (userId == null || userId.isBlank()) return;
+        resetPassword(accessToken, userId, password);
     }
 
     private String getAdminAccessToken() {
@@ -254,6 +306,193 @@ public class KeycloakUserProvisioningServiceImpl implements KeycloakUserProvisio
             if (first.has("id")) return first.get("id").asText();
         }
         throw new RuntimeException("Keycloak created user but cannot find it by email");
+    }
+
+    private String findUserIdByEmailOrUsername(String accessToken, String email, String username) throws IOException, InterruptedException {
+        if (email != null && !email.isBlank()) {
+            try {
+                return findUserIdByEmail(accessToken, email);
+            } catch (RuntimeException ignored) {
+                // fallback to username
+            }
+        }
+        if (username == null || username.isBlank()) {
+            return null;
+        }
+
+        String searchUrl = keycloakBaseUrl + "/admin/realms/" + keycloakRealm + "/users?username=" + urlEncode(username) + "&exact=true";
+        HttpRequest request = HttpRequest.newBuilder()
+                .uri(URI.create(searchUrl))
+                .header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken)
+                .header(HttpHeaders.ACCEPT, MediaType.APPLICATION_JSON_VALUE)
+                .GET()
+                .build();
+
+        HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
+        if (response.statusCode() < 200 || response.statusCode() >= 300) {
+            throw new RuntimeException("Keycloak find user by username failed: status=" + response.statusCode());
+        }
+
+        JsonNode arr = objectMapper.readTree(response.body());
+        if (arr.isArray() && arr.size() > 0) {
+            JsonNode first = arr.get(0);
+            if (first.has("id")) return first.get("id").asText();
+        }
+        return null;
+    }
+
+    private void updateBasicProfile(String accessToken, String keycloakUserId, String username, String email) {
+        String updateUrl = keycloakBaseUrl + "/admin/realms/" + keycloakRealm + "/users/" + keycloakUserId;
+        try {
+            HttpResponse<String> response = sendUserUpdateRequest(updateUrl, accessToken, username, email, true);
+            if (response.statusCode() == 400 && response.body() != null && response.body().contains("error-user-attribute-read-only")) {
+                // В этом realm username запрещено менять. Чтобы не рассинхронизировать данные,
+                // отклоняем обновление целиком (а не молча обновляем только email).
+                throw new BadRequestException(
+                        "В Keycloak запрещено изменять username (User Profile / editUsernameAllowed). " +
+                                "Разрешите редактирование username в realm или меняйте только email.",
+                        "KEYCLOAK_USERNAME_READ_ONLY"
+                );
+            }
+            if (response.statusCode() < 200 || response.statusCode() >= 300) {
+                throw new RuntimeException("Keycloak user update failed: status=" + response.statusCode() + ", body=" + response.body());
+            }
+        } catch (IOException | InterruptedException e) {
+            Thread.currentThread().interrupt();
+            throw new RuntimeException("Keycloak user update failed", e);
+        }
+    }
+
+    private HttpResponse<String> sendUserUpdateRequest(
+            String updateUrl,
+            String accessToken,
+            String username,
+            String email,
+            boolean includeUsername
+    ) throws IOException, InterruptedException {
+        ObjectNode payload = objectMapper.createObjectNode();
+        if (includeUsername) {
+            payload.put("username", username);
+        }
+        payload.put("email", email);
+        payload.put("enabled", true);
+        payload.put("emailVerified", true);
+        payload.putArray("requiredActions");
+
+        HttpRequest request = HttpRequest.newBuilder()
+                .uri(URI.create(updateUrl))
+                .header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken)
+                .header(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_JSON_VALUE)
+                .PUT(HttpRequest.BodyPublishers.ofString(payload.toString()))
+                .build();
+        HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
+        if (response.statusCode() == 409) {
+            throw new ResourceAlreadyExistsException("Пользователь", includeUsername ? "email/username" : "email", email);
+        }
+        return response;
+    }
+
+    private void resetPassword(String accessToken, String keycloakUserId, String password) {
+        String url = keycloakBaseUrl + "/admin/realms/" + keycloakRealm + "/users/" + keycloakUserId + "/reset-password";
+        ObjectNode payload = objectMapper.createObjectNode();
+        payload.put("type", "password");
+        payload.put("value", password);
+        payload.put("temporary", false);
+
+        HttpRequest request = HttpRequest.newBuilder()
+                .uri(URI.create(url))
+                .header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken)
+                .header(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_JSON_VALUE)
+                .PUT(HttpRequest.BodyPublishers.ofString(payload.toString()))
+                .build();
+        try {
+            HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
+            if (response.statusCode() < 200 || response.statusCode() >= 300) {
+                throw new RuntimeException("Keycloak password reset failed: status=" + response.statusCode() + ", body=" + response.body());
+            }
+        } catch (IOException | InterruptedException e) {
+            Thread.currentThread().interrupt();
+            throw new RuntimeException("Keycloak password reset failed", e);
+        }
+    }
+
+    private void syncRealmRole(String accessToken, String keycloakUserId, String roleName) {
+        if (roleName == null || roleName.isBlank()) {
+            return;
+        }
+        try {
+            getOrCreateRealmRole(accessToken, roleName);
+            ArrayNode currentRoles = getCurrentManagedRealmRoles(accessToken, keycloakUserId);
+            removeRealmRoles(accessToken, keycloakUserId, currentRoles);
+            assignRealmRole(accessToken, keycloakUserId, roleName);
+        } catch (IOException | InterruptedException e) {
+            Thread.currentThread().interrupt();
+            throw new RuntimeException("Keycloak role sync failed", e);
+        }
+    }
+
+    private JsonNode getOrCreateRealmRole(String accessToken, String roleName) throws IOException, InterruptedException {
+        String roleGetUrl = keycloakBaseUrl + "/admin/realms/" + keycloakRealm + "/roles/" + urlEncode(roleName);
+        HttpRequest roleGetRequest = HttpRequest.newBuilder()
+                .uri(URI.create(roleGetUrl))
+                .header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken)
+                .header(HttpHeaders.ACCEPT, MediaType.APPLICATION_JSON_VALUE)
+                .GET()
+                .build();
+        HttpResponse<String> roleGetResponse = httpClient.send(roleGetRequest, HttpResponse.BodyHandlers.ofString());
+        if (roleGetResponse.statusCode() == 404) {
+            createRoleIfMissing(accessToken, roleName);
+            roleGetResponse = httpClient.send(roleGetRequest, HttpResponse.BodyHandlers.ofString());
+        }
+        if (roleGetResponse.statusCode() < 200 || roleGetResponse.statusCode() >= 300) {
+            throw new RuntimeException(
+                    "Keycloak role lookup failed: status=" + roleGetResponse.statusCode() + ", body=" + roleGetResponse.body()
+            );
+        }
+        return objectMapper.readTree(roleGetResponse.body());
+    }
+
+    private ArrayNode getCurrentManagedRealmRoles(String accessToken, String keycloakUserId) throws IOException, InterruptedException {
+        String url = keycloakBaseUrl + "/admin/realms/" + keycloakRealm + "/users/" + keycloakUserId + "/role-mappings/realm";
+        HttpRequest request = HttpRequest.newBuilder()
+                .uri(URI.create(url))
+                .header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken)
+                .header(HttpHeaders.ACCEPT, MediaType.APPLICATION_JSON_VALUE)
+                .GET()
+                .build();
+        HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
+        if (response.statusCode() < 200 || response.statusCode() >= 300) {
+            throw new RuntimeException("Keycloak read current roles failed: status=" + response.statusCode() + ", body=" + response.body());
+        }
+        JsonNode parsed = objectMapper.readTree(response.body());
+        if (parsed instanceof ArrayNode) {
+            ArrayNode filtered = objectMapper.createArrayNode();
+            for (JsonNode node : (ArrayNode) parsed) {
+                String roleName = node.has("name") ? node.get("name").asText() : null;
+                if (roleName != null && MANAGED_REALM_ROLES.contains(roleName)) {
+                    filtered.add(node);
+                }
+            }
+            return filtered;
+        }
+        return objectMapper.createArrayNode();
+    }
+
+    private void removeRealmRoles(String accessToken, String keycloakUserId, ArrayNode currentRoles) throws IOException, InterruptedException {
+        if (currentRoles == null || currentRoles.isEmpty()) {
+            return;
+        }
+        String url = keycloakBaseUrl + "/admin/realms/" + keycloakRealm + "/users/" + keycloakUserId + "/role-mappings/realm";
+        HttpRequest request = HttpRequest.newBuilder()
+                .uri(URI.create(url))
+                .header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken)
+                .header(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_JSON_VALUE)
+                .method("DELETE", HttpRequest.BodyPublishers.ofString(currentRoles.toString()))
+                .build();
+        HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
+        if (response.statusCode() < 200 || response.statusCode() >= 300) {
+            throw new RuntimeException("Keycloak remove old roles failed: status=" + response.statusCode() + ", body=" + response.body());
+        }
     }
 
     private static String urlEncode(String value) {

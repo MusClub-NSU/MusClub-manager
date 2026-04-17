@@ -10,6 +10,9 @@ import com.nsu.musclub.repository.UserRepository;
 import com.nsu.musclub.service.SearchIndexingService;
 import com.nsu.musclub.service.KeycloakUserProvisioningService;
 import com.nsu.musclub.service.UserService;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationToken;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
@@ -75,6 +78,8 @@ public class UserServiceImpl implements UserService {
     public UserResponseDto update(Long id, UserUpdateDto dto) {
         var u = users.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Пользователь", id));
+        String oldUsername = u.getUsername();
+        String oldEmail = u.getEmail();
 
         // UI may send partial updates (e.g. only username). Keep existing fields if omitted.
         if (dto.getUsername() == null) dto.setUsername(u.getUsername());
@@ -97,6 +102,15 @@ public class UserServiceImpl implements UserService {
         if (!u.getEmail().equals(dto.getEmail()) && users.existsByEmail(dto.getEmail())) {
             throw new ResourceAlreadyExistsException("Пользователь", "email", dto.getEmail());
         }
+
+        keycloakUserProvisioningService.updateUserProfile(
+                oldEmail,
+                oldUsername,
+                dto.getUsername(),
+                dto.getEmail(),
+                u.getRole().equals(dto.getRole()) ? null : dto.getRole(),
+                dto.getPassword()
+        );
 
         UserMapper.update(dto, u);
         User updated = users.save(u);
@@ -164,10 +178,47 @@ public class UserServiceImpl implements UserService {
 
     @Override
     public void delete(Long id) {
-        if (!users.existsById(id)) {
-            throw new ResourceNotFoundException("Пользователь", id);
-        }
+        User user = users.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Пользователь", id));
+        keycloakUserProvisioningService.deleteUserByProfileQuietly(user.getEmail(), user.getUsername());
         users.deleteById(id);
         searchIndexingService.removeUser(id);
+    }
+
+    @Override
+    public void updatePassword(Long id, UserPasswordUpdateDto dto) {
+        if (dto == null || dto.getPassword() == null || dto.getPassword().isBlank()) {
+            throw new BadRequestException("Пароль обязателен", "PASSWORD_REQUIRED");
+        }
+        User user = users.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Пользователь", id));
+
+        if (!canChangePasswordForUser(user)) {
+            throw new BadRequestException("Недостаточно прав для смены пароля", "PASSWORD_CHANGE_FORBIDDEN");
+        }
+
+        keycloakUserProvisioningService.resetPasswordByProfile(user.getEmail(), user.getUsername(), dto.getPassword());
+    }
+
+    private boolean canChangePasswordForUser(User target) {
+        Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+        if (auth == null) return false;
+
+        String requesterEmail = null;
+        if (auth instanceof JwtAuthenticationToken jwt) {
+            requesterEmail = jwt.getToken().getClaimAsString("email");
+        }
+
+        boolean isSuperAdmin = auth.getAuthorities().stream()
+                .anyMatch(a -> "ROLE_SUPERADMIN".equals(a.getAuthority()));
+        // Fallback: в некоторых потоках роль SUPERADMIN есть только в нашей БД, а не в JWT authorities.
+        if (!isSuperAdmin && requesterEmail != null) {
+            isSuperAdmin = users.findByEmailIgnoreCase(requesterEmail)
+                    .map(u -> "SUPERADMIN".equalsIgnoreCase(u.getRole()) || "SUPER_ADMIN".equalsIgnoreCase(u.getRole()))
+                    .orElse(false);
+        }
+        if (isSuperAdmin) return true;
+
+        return requesterEmail != null && requesterEmail.equalsIgnoreCase(target.getEmail());
     }
 }

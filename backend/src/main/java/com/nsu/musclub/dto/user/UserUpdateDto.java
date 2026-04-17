@@ -11,6 +11,8 @@ public class UserUpdateDto {
     private String email;
     @Size(max = 50)
     private String role;
+    @Size(min = 8, max = 255)
+    private String password;
 
     public String getUsername() {
         return username;
@@ -34,5 +36,13 @@ public class UserUpdateDto {
 
     public void setRole(String role) {
         this.role = role;
+    }
+
+    public String getPassword() {
+        return password;
+    }
+
+    public void setPassword(String password) {
+        this.password = password;
     }
 }

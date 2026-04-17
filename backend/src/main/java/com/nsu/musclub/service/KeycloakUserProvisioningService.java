@@ -13,5 +13,20 @@ public interface KeycloakUserProvisioningService {
      * Лучший-успех: удаляет пользователя в Keycloak (используется для отката).
      */
     void deleteUserQuietly(String keycloakUserId);
+
+    /**
+     * Удаляет пользователя в Keycloak по email/username из нашей БД.
+     */
+    void deleteUserByProfileQuietly(String email, String username);
+
+    /**
+     * Обновляет профиль пользователя в Keycloak (username/email/role/password).
+     */
+    void updateUserProfile(String oldEmail, String oldUsername, String newUsername, String newEmail, String role, String password);
+
+    /**
+     * Сбрасывает пароль пользователя в Keycloak.
+     */
+    void resetPasswordByProfile(String email, String username, String password);
 }
 

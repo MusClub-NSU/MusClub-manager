@@ -35,6 +35,10 @@ export default function UserDetailsPage() {
     const [isEditing, setIsEditing] = useState(false);
     const [copiedEmail, setCopiedEmail] = useState(false);
     const [avatarPreview, setAvatarPreview] = useState<string | null>(null);
+    const [saveError, setSaveError] = useState<string | null>(null);
+    const [passwordValue, setPasswordValue] = useState('');
+    const [passwordSaving, setPasswordSaving] = useState(false);
+    const [passwordSaved, setPasswordSaved] = useState(false);
     const [editData, setEditData] = useState({ username: '', email: '', role: '' });
 
     useEffect(() => {
@@ -45,6 +49,13 @@ export default function UserDetailsPage() {
             role: user.role,
         });
     }, [user]);
+
+    useEffect(() => {
+        if (!isEditing) {
+            setPasswordValue('');
+            setPasswordSaved(false);
+        }
+    }, [isEditing]);
 
     if (loading) {
         return (
@@ -79,19 +90,54 @@ export default function UserDetailsPage() {
 
     const handleSave = async () => {
         if (!canEditProfile) return;
+        setSaveError(null);
 
-        if (canManageUsers) {
-            await updateUser(user.id, {
-                username: editData.username,
-                email: editData.email,
-                role: editData.role,
-            });
-        } else {
-            await updateUser(user.id, { username: editData.username });
+        try {
+            if (canManageUsers) {
+                await updateUser(user.id, {
+                    username: editData.username,
+                    email: editData.email,
+                    role: editData.role,
+                });
+            } else {
+                await updateUser(user.id, { username: editData.username });
+            }
+
+            setIsEditing(false);
+            await refetch();
+        } catch (err) {
+            const message = err instanceof Error ? err.message : 'Не удалось сохранить изменения';
+            setSaveError(message);
+        }
+    };
+
+    const canChangePassword = isSelf || canManageUsers;
+    const handleChangePassword = async () => {
+        if (!canChangePassword) return;
+        const nextPassword = passwordValue.trim();
+        if (!nextPassword) {
+            setSaveError('Введите новый пароль');
+            return;
+        }
+        if (nextPassword.length < 8) {
+            setSaveError('Новый пароль должен содержать минимум 8 символов');
+            return;
         }
 
-        setIsEditing(false);
-        await refetch();
+        setSaveError(null);
+        setPasswordSaving(true);
+        setPasswordSaved(false);
+        try {
+            await apiClient.updateUserPassword(user.id, nextPassword);
+            setPasswordValue('');
+            setPasswordSaved(true);
+            setTimeout(() => setPasswordSaved(false), 1500);
+        } catch (err) {
+            const message = err instanceof Error ? err.message : 'Не удалось сменить пароль';
+            setSaveError(message);
+        } finally {
+            setPasswordSaving(false);
+        }
     };
 
     const handleAvatarChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -281,6 +327,41 @@ export default function UserDetailsPage() {
                                 <Icon data={Calendar} size={16} />
                                 <span>Зарегистрирован: {new Date(user.createdAt).toLocaleDateString('ru-RU')}</span>
                             </div>
+
+                            {isEditing && canChangePassword && (
+                                <div
+                                    className="mt-1 p-4 rounded-xl border"
+                                    style={{
+                                        borderColor: 'var(--color-line-generic)',
+                                        backgroundColor: 'var(--color-background-secondary)',
+                                    }}
+                                >
+                                    <div className="flex flex-col gap-2">
+                                        <Text variant="body-2">Новый пароль</Text>
+                                        <input
+                                            type="password"
+                                            value={passwordValue}
+                                            onChange={(e) => setPasswordValue(e.target.value)}
+                                            placeholder={isSelf ? 'Новый пароль для вашего аккаунта' : 'Новый пароль для пользователя'}
+                                            className="w-full px-3 py-2 border rounded-lg"
+                                            style={{
+                                                borderColor: 'var(--color-line-generic)',
+                                                backgroundColor: 'var(--color-background)',
+                                                color: 'var(--color-text-primary)',
+                                            }}
+                                        />
+                                        <div className="flex items-center gap-3">
+                                            <Button view="outlined" size="m" onClick={handleChangePassword} disabled={passwordSaving || visible}>
+                                                {passwordSaving ? 'Сохранение...' : 'Сменить пароль'}
+                                            </Button>
+                                            {passwordSaved && <Text style={{ color: 'rgb(37, 99, 235)' }}>Готово</Text>}
+                                        </div>
+                                        <Text variant="caption-2" color="secondary">
+                                            Минимум 8 символов.
+                                        </Text>
+                                    </div>
+                                </div>
+                            )}
                         </div>
                     </div>
                 </Card>
@@ -290,6 +371,13 @@ export default function UserDetailsPage() {
                 </Card>
 
                 <div className="flex flex-wrap justify-center gap-3">
+                    {saveError && (
+                        <div className="w-full">
+                            <Card className="p-3">
+                                <Text color="danger">{saveError}</Text>
+                            </Card>
+                        </div>
+                    )}
                     {isEditing ? (
                         <>
                             <Button view="outlined" className="min-w-40" size="l" onClick={() => setIsEditing(false)}>

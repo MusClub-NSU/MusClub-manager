@@ -45,6 +45,12 @@ public class UserController {
         return service.update(id, dto);
     }
 
+    @PutMapping("/{id}/password")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    public void updatePassword(@PathVariable Long id, @RequestBody @Valid UserPasswordUpdateDto dto) {
+        service.updatePassword(id, dto);
+    }
+
     @PostMapping(value = "/{id}/avatar", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     public UserResponseDto uploadAvatar(@PathVariable Long id, @RequestParam("file") MultipartFile file) {
         return service.uploadAvatar(id, file);

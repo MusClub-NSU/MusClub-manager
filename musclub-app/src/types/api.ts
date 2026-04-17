@@ -19,6 +19,7 @@ export interface UserUpdateDto {
   username?: string;
   email?: string;
   role?: string;
+  password?: string;
 }
 
 // Типы для API событий

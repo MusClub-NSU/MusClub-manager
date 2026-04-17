@@ -26,7 +26,8 @@ export default function ParticipantsPage() {
     const [editFormData, setEditFormData] = useState({
         username: '',
         email: '',
-        role: 'MEMBER'
+        role: 'MEMBER',
+        password: '',
     });
 
     useEffect(() => {
@@ -96,7 +97,8 @@ export default function ParticipantsPage() {
         setEditFormData({
             username: user.username,
             email: user.email,
-            role: user.role
+            role: user.role,
+            password: '',
         });
     };
 
@@ -107,12 +109,18 @@ export default function ParticipantsPage() {
     const handleSaveEdit = async () => {
         if (!canManageUsers) return;
         if (!editingUser) return;
+        if (editFormData.password.trim() && editFormData.password.trim().length < 8) {
+            alert('Новый пароль должен содержать минимум 8 символов');
+            return;
+        }
 
         try {
+            const password = editFormData.password.trim();
             await updateUser(editingUser.id, {
                 username: editFormData.username,
                 email: editFormData.email,
-                role: editFormData.role
+                role: editFormData.role,
+                ...(password ? { password } : {}),
             });
             handleCloseEdit();
         } catch (err) {
@@ -494,6 +502,22 @@ export default function ParticipantsPage() {
                                         <option value="MEMBER">Участник</option>
                                         <option value="ORGANIZER">Организатор</option>
                                     </select>
+                                </div>
+
+                                <div className="group">
+                                    <label className="block text-sm font-medium mb-2">
+                                        Новый пароль
+                                    </label>
+                                    <input
+                                        type="password"
+                                        value={editFormData.password}
+                                        onChange={(e) => setEditFormData({ ...editFormData, password: e.target.value })}
+                                        placeholder="Оставьте пустым, чтобы не менять"
+                                        className="w-full px-4 py-2 border border-[--foreground]/20 rounded-lg bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                    />
+                                    <Text variant="body-1" color="secondary" className="mt-1">
+                                        Минимум 8 символов, если указываете пароль.
+                                    </Text>
                                 </div>
 
                                 <div className="flex justify-end gap-3 mt-4">

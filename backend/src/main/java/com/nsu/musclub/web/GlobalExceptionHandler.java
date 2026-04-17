@@ -249,12 +249,15 @@ public class GlobalExceptionHandler {
             Exception ex, HttpServletRequest request) {
 
         log.error("Unexpected error occurred", ex);
+        String message = (ex.getMessage() != null && !ex.getMessage().isBlank())
+                ? ex.getMessage()
+                : "Произошла внутренняя ошибка сервера";
 
         ErrorResponse error = new ErrorResponse(
                 HttpStatus.INTERNAL_SERVER_ERROR.value(),
                 HttpStatus.INTERNAL_SERVER_ERROR.getReasonPhrase(),
                 "INTERNAL_ERROR",
-                "Произошла внутренняя ошибка сервера",
+                message,
                 request.getRequestURI()
         );
 

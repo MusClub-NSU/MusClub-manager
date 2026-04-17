@@ -62,7 +62,7 @@ export function useUsers(pageable?: Pageable) {
     }
   };
 
-  const updateUser = async (id: number, userData: Partial<{ username: string; email: string; role: string }>) => {
+  const updateUser = async (id: number, userData: Partial<{ username: string; email: string; role: string; password: string }>) => {
     try {
       const updatedUser = await apiClient.updateUser(id, userData);
       setUsers(prev => prev.map(user => user.id === id ? updatedUser : user));

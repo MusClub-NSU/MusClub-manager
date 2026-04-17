@@ -143,6 +143,13 @@ class ApiClient {
     });
   }
 
+  async updateUserPassword(id: number, password: string): Promise<void> {
+    return this.request<void>(`/users/${id}/password`, {
+      method: 'PUT',
+      body: JSON.stringify({ password }),
+    });
+  }
+
   async deleteUser(id: number): Promise<void> {
     return this.request<void>(`/users/${id}`, {
       method: 'DELETE',
