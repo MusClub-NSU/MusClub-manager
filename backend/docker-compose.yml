@@ -51,6 +51,8 @@ services:
       context: .
       dockerfile: Dockerfile
     container_name: musclub_app
+    env_file:
+      - .env
     environment:
       SPRING_DATASOURCE_URL: jdbc:postgresql://db:5432/musclub
       SPRING_DATASOURCE_USERNAME: musclub
@@ -62,7 +64,6 @@ services:
       KEYCLOAK_ADMIN_PASSWORD: admin
       VAPID_PUBLIC_KEY: ""
       VAPID_PRIVATE_KEY: ""
-      DEEPSEEK_API_KEY: ""
     ports:
       - "8080:8080"
     depends_on:
