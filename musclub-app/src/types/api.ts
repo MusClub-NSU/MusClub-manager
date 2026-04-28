@@ -12,12 +12,14 @@ export interface UserCreateDto {
   username: string;
   email: string;
   role: string;
+  password: string;
 }
 
 export interface UserUpdateDto {
   username?: string;
   email?: string;
   role?: string;
+  password?: string;
 }
 
 // Типы для API событий
@@ -126,5 +128,17 @@ export interface EventProgramItemUpdateDto {
   plannedTime?: string;
   durationText?: string;
   notes?: string;
+}
+
+export type SearchEntityType = 'EVENT' | 'USER';
+
+export interface SearchResult {
+  entityType: SearchEntityType;
+  entityId: number;
+  title: string;
+  snippet: string;
+  score: number;
+  lexicalScore: number;
+  vectorScore: number;
 }
 

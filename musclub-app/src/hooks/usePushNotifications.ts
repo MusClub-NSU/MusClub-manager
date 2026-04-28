@@ -15,11 +15,6 @@ const API_BASE_URL =
       (process.env.NEXT_PUBLIC_API_URL || '/api')
     : (process.env.NEXT_PUBLIC_API_URL || '/api');
 
-// Логируем для отладки
-if (typeof window !== 'undefined') {
-  console.log('[Push] API_BASE_URL:', API_BASE_URL, 'NEXT_PUBLIC_API_URL:', process.env.NEXT_PUBLIC_API_URL, 'ENV_API_URL:', (window as unknown as { ENV_API_URL?: string }).ENV_API_URL);
-}
-
 /** Временная константа userId для авто-подписки (пока без авторизации) */
 const DEFAULT_USER_ID = 1;
 
@@ -230,16 +225,22 @@ export function usePushNotifications(): UsePushNotificationsReturn {
 
   // Получение VAPID ключа с сервера
   const getVapidPublicKey = useCallback(async (): Promise<string> => {
-    const response = await fetch(getPushApiUrl('vapid-public-key'), { headers: API_HEADERS });
-    if (!response.ok) {
-      const contentType = response.headers.get('content-type');
-      if (!contentType?.includes('application/json')) {
-        throw new Error('Бэкенд недоступен. Для мобильного устройства установите window.ENV_API_URL с URL бэкенда.');
+    try {
+      const response = await fetch(getPushApiUrl('vapid-public-key'), { headers: API_HEADERS });
+      if (!response.ok) {
+        const contentType = response.headers.get('content-type') || '';
+        if (contentType.includes('application/json')) {
+          const data = await response.json().catch(() => ({} as { message?: string }));
+          throw new Error(data.message || 'Не удалось получить VAPID ключ');
+        }
+        // Для HTML/прокси-ответов не показываем "красную" ошибку Next.js.
+        throw new Error('Push-сервис временно недоступен');
       }
-      throw new Error('Не удалось получить VAPID ключ');
+      const data = await response.json();
+      return data.publicKey;
+    } catch {
+      throw new Error('Push-сервис временно недоступен');
     }
-    const data = await response.json();
-    return data.publicKey;
   }, []);
 
   const subscribe = useCallback(async (userId: number): Promise<boolean> => {
@@ -328,7 +329,8 @@ export function usePushNotifications(): UsePushNotificationsReturn {
 
       return true;
     } catch (error) {
-      console.error('Push subscription error:', error);
+      // Не засоряем консоль "ошибками" в dev, если push endpoint сейчас недоступен.
+      console.warn('Push subscription skipped:', error);
       setState(prev => ({
         ...prev,
         isLoading: false,

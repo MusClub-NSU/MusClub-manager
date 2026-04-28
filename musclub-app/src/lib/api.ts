@@ -17,6 +17,8 @@ import {
   EventProgramItem,
   EventProgramItemCreateDto,
   EventProgramItemUpdateDto,
+  SearchEntityType,
+  SearchResult,
 } from '@/types/api';
 
 // По умолчанию ходим на "/api" (Next.js proxy -> backend через rewrites в next.config.ts).
@@ -127,6 +129,10 @@ class ApiClient {
     return this.request<User>(`/users/${id}`);
   }
 
+  async getCurrentUser(): Promise<User> {
+    return this.request<User>('/users/me');
+  }
+
   async createUser(user: UserCreateDto): Promise<User> {
     return this.request<User>('/users', {
       method: 'POST',
@@ -138,6 +144,13 @@ class ApiClient {
     return this.request<User>(`/users/${id}`, {
       method: 'PUT',
       body: JSON.stringify(user),
+    });
+  }
+
+  async updateUserPassword(id: number, password: string): Promise<void> {
+    return this.request<void>(`/users/${id}/password`, {
+      method: 'PUT',
+      body: JSON.stringify({ password }),
     });
   }
 
@@ -288,6 +301,22 @@ class ApiClient {
       method: 'PUT',
       body: JSON.stringify(itemIds),
     });
+  }
+
+  async hybridSearch(
+    query: string,
+    types: SearchEntityType[] = ['EVENT', 'USER'],
+    pageable: Pageable = { page: 0, size: 20 },
+  ): Promise<Page<SearchResult>> {
+    const params = new URLSearchParams();
+    params.append('q', query);
+    params.append('page', pageable.page.toString());
+    params.append('size', pageable.size.toString());
+    if (pageable.sort) {
+      params.append('sort', pageable.sort);
+    }
+    types.forEach((type) => params.append('types', type));
+    return this.request<Page<SearchResult>>(`/search/hybrid?${params.toString()}`);
   }
 }
 

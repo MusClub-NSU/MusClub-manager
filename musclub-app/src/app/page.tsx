@@ -31,27 +31,27 @@ export default function Home() {
         .sort((a, b) => new Date(a.startTime).getTime() - new Date(b.startTime).getTime());
 
     return (
-        <main className="min-h-screen">
-            <header className="sticky top-0 z-10 py-4 pr-4 pl-14 sm:px-4 bg-background/80 backdrop-blur">
-                <div className="mx-auto w-full max-w-5xl flex items-center justify-between gap-4">
-                    <h1 className="text-xl sm:text-2xl md:text-3xl font-bold">
-                        Добро пожаловать в MusClub Manager
-                    </h1>
+        <main className="min-h-screen overflow-y-auto p-5 sm:p-6 md:p-8 pt-8 sm:pt-10 md:pt-12">
+            <div className="w-full max-w-5xl mx-auto">
+                <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4 mb-8">
+                    <div>
+                        <h1 className="text-5xl font-bold leading-[1.15] pb-1 bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent mb-1">
+                            MusClub Manager
+                        </h1>
+                    </div>
                     {!session && (
                         <Button
                             view="action"
-                            size="m"
-                            className="shrink-0"
+                            size="l"
+                            className="px-6 py-3 bg-gradient-to-r from-blue-600 to-blue-500 hover:from-blue-700 hover:to-blue-600 text-white font-semibold shadow-lg hover:shadow-xl transition-all duration-200"
                             onClick={() => router.push('/login?callbackUrl=/')}
                         >
                             Авторизоваться
                         </Button>
                     )}
                 </div>
-            </header>
 
-            <div className="mx-auto w-full max-w-5xl px-4 py-6">
-                <Card className="p-6">
+                <Card className="p-6 rounded-xl border shadow-sm" style={{ borderColor: 'var(--color-line-generic)' }}>
                     <div className="flex items-center justify-between gap-4 mb-4">
                         <h2 className="text-2xl font-semibold">Ближайшие мероприятия</h2>
                         <Text color="secondary" className="text-sm whitespace-nowrap">
@@ -74,7 +74,11 @@ export default function Home() {
                                 <div key={event.id} className="py-4 flex items-start justify-between gap-4">
                                     <div className="min-w-0">
                                         <Link
-                                            href={`/events/${event.id}`}
+                                            href={
+                                                session
+                                                    ? `/events/${event.id}`
+                                                    : `/login?callbackUrl=${encodeURIComponent(`/events/${event.id}`)}`
+                                            }
                                             className="font-semibold hover:underline block truncate"
                                             title={event.title}
                                         >

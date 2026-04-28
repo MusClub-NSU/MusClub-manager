@@ -10,9 +10,13 @@ public interface UserService {
 
     UserResponseDto get(Long id);
 
+    UserResponseDto getCurrentUser();
+
     Page<UserResponseDto> list(Pageable pageable);
 
     UserResponseDto update(Long id, UserUpdateDto dto);
+
+    void updatePassword(Long id, UserPasswordUpdateDto dto);
 
     UserResponseDto uploadAvatar(Long id, MultipartFile file);
 

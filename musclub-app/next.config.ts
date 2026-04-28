@@ -9,8 +9,11 @@ const withPWA = require("next-pwa")({
 
 import type { NextConfig } from "next";
 
+const backendInternalUrl = process.env.BACKEND_INTERNAL_URL || "http://localhost:8080";
+
 const nextConfig: NextConfig = {
     reactStrictMode: true,
+    output: "standalone",
     async rewrites() {
         return [
             {
@@ -21,7 +24,7 @@ const nextConfig: NextConfig = {
             {
                 // Остальной backend уходит на Spring Boot
                 source: "/api/:path*",
-                destination: "http://localhost:8080/api/:path*",
+                destination: `${backendInternalUrl}/api/:path*`,
             },
         ];
     },

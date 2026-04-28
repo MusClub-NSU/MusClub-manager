@@ -1,8 +1,9 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
+import { useSession } from 'next-auth/react';
 import { apiClient } from '../lib/api';
-import { User, Event, Pageable } from '../types/api';
+import { User, Event, Pageable, SearchEntityType, SearchResult } from '../types/api';
 
 function sortEventsByStartTimeDesc(events: Event[]): Event[] {
   return [...events].sort((a, b) => {
@@ -21,13 +22,14 @@ function sortEventsByStartTimeDesc(events: Event[]): Event[] {
 
 // Хук для работы с пользователями
 export function useUsers(pageable?: Pageable) {
+  const { status } = useSession();
   const [users, setUsers] = useState<User[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [totalElements, setTotalElements] = useState(0);
   const [totalPages, setTotalPages] = useState(0);
 
-  const fetchUsers = async () => {
+  const fetchUsers = useCallback(async () => {
     try {
       setLoading(true);
       setError(null);
@@ -40,13 +42,16 @@ export function useUsers(pageable?: Pageable) {
     } finally {
       setLoading(false);
     }
-  };
-
-  useEffect(() => {
-    fetchUsers();
   }, [pageable?.page, pageable?.size, pageable?.sort]);
 
-  const createUser = async (userData: { username: string; email: string; role: string }) => {
+  // После входа сессия появляется с задержкой — без повторного запроса список
+  // остаётся пустым и «Перейти в профиль» ведёт на /participants вместо /participants/:id
+  useEffect(() => {
+    if (status === 'loading') return;
+    void fetchUsers();
+  }, [fetchUsers, status]);
+
+  const createUser = async (userData: { username: string; email: string; role: string; password: string }) => {
     try {
       const newUser = await apiClient.createUser(userData);
       setUsers(prev => [newUser, ...prev]);
@@ -57,7 +62,7 @@ export function useUsers(pageable?: Pageable) {
     }
   };
 
-  const updateUser = async (id: number, userData: Partial<{ username: string; email: string; role: string }>) => {
+  const updateUser = async (id: number, userData: Partial<{ username: string; email: string; role: string; password: string }>) => {
     try {
       const updatedUser = await apiClient.updateUser(id, userData);
       setUsers(prev => prev.map(user => user.id === id ? updatedUser : user));
@@ -172,6 +177,43 @@ export function useEvents(pageable?: Pageable) {
     updateEvent,
     deleteEvent,
     refetch: fetchEvents,
+  };
+}
+
+export function useHybridSearch() {
+  const [results, setResults] = useState<SearchResult[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const search = useCallback(async (
+    query: string,
+    types: SearchEntityType[] = ['EVENT', 'USER'],
+    pageable: Pageable = { page: 0, size: 20 },
+  ) => {
+    if (!query.trim()) {
+      setResults([]);
+      setError(null);
+      return;
+    }
+
+    try {
+      setLoading(true);
+      setError(null);
+      const response = await apiClient.hybridSearch(query.trim(), types, pageable);
+      setResults(response.content);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Ошибка поиска');
+      setResults([]);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  return {
+    results,
+    loading,
+    error,
+    search,
   };
 }
 

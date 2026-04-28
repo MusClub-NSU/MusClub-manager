@@ -6,7 +6,7 @@
   "loginWithEmailAllowed": true,
   "duplicateEmailsAllowed": false,
   "resetPasswordAllowed": true,
-  "editUsernameAllowed": false,
+  "editUsernameAllowed": true,
   "bruteForceProtected": true,
   "requiredActions": [
     {
@@ -24,9 +24,10 @@
       "clientId": "musclub-frontend",
       "name": "MusClub Frontend",
       "enabled": true,
+      "baseUrl": "http://localhost:3000",
       "publicClient": true,
       "standardFlowEnabled": true,
-      "directAccessGrantsEnabled": true,
+      "directAccessGrantsEnabled": false,
       "redirectUris": [
         "http://localhost:3000/*",
         "http://localhost:3000/api/auth/callback/keycloak"
@@ -34,6 +35,9 @@
       "webOrigins": [
         "http://localhost:3000"
       ],
+      "attributes": {
+        "post.logout.redirect.uris": "http://localhost:3000/*"
+      },
       "protocol": "openid-connect"
     }
   ],
@@ -46,8 +50,50 @@
       {
         "name": "MEMBER",
         "description": "Участник клуба"
+      },
+      {
+        "name": "SUPERADMIN",
+        "description": "Администратор приложения"
       }
     ]
   },
+  "users": [
+    {
+      "username": "organizer",
+      "enabled": true,
+      "emailVerified": true,
+      "firstName": "Demo",
+      "lastName": "Organizer",
+      "email": "organizer@musclub.local",
+      "credentials": [
+        {
+          "type": "password",
+          "value": "musclub123",
+          "temporary": false
+        }
+      ],
+      "realmRoles": [
+        "ORGANIZER"
+      ]
+    },
+    {
+      "username": "member",
+      "enabled": true,
+      "emailVerified": true,
+      "firstName": "Demo",
+      "lastName": "Member",
+      "email": "member@musclub.local",
+      "credentials": [
+        {
+          "type": "password",
+          "value": "musclub123",
+          "temporary": false
+        }
+      ],
+      "realmRoles": [
+        "MEMBER"
+      ]
+    }
+  ],
   "defaultRoles": ["MEMBER"]
 }

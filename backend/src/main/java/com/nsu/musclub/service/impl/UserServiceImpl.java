@@ -7,7 +7,12 @@ import com.nsu.musclub.exception.ResourceAlreadyExistsException;
 import com.nsu.musclub.exception.ResourceNotFoundException;
 import com.nsu.musclub.mapper.UserMapper;
 import com.nsu.musclub.repository.UserRepository;
+import com.nsu.musclub.service.SearchIndexingService;
+import com.nsu.musclub.service.KeycloakUserProvisioningService;
 import com.nsu.musclub.service.UserService;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationToken;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
@@ -22,9 +27,15 @@ public class UserServiceImpl implements UserService {
     private static final long MAX_AVATAR_SIZE_BYTES = 5 * 1024 * 1024;
 
     private final UserRepository users;
+    private final SearchIndexingService searchIndexingService;
+    private final KeycloakUserProvisioningService keycloakUserProvisioningService;
 
-    public UserServiceImpl(UserRepository users) {
+    public UserServiceImpl(UserRepository users,
+                           SearchIndexingService searchIndexingService,
+                           KeycloakUserProvisioningService keycloakUserProvisioningService) {
         this.users = users;
+        this.searchIndexingService = searchIndexingService;
+        this.keycloakUserProvisioningService = keycloakUserProvisioningService;
     }
 
     @Override
@@ -35,7 +46,19 @@ public class UserServiceImpl implements UserService {
         if (users.existsByEmail(dto.getEmail())) {
             throw new ResourceAlreadyExistsException("Пользователь", "email", dto.getEmail());
         }
-        return UserMapper.toDto(users.save(UserMapper.toEntity(dto)));
+
+        // 1) Provision user in Keycloak
+        String keycloakUserId = keycloakUserProvisioningService.createUserAndAssignRole(dto);
+
+        // 2) Save user in our DB (rollback best-effort if something fails)
+        try {
+            User created = users.save(UserMapper.toEntity(dto));
+            searchIndexingService.indexUser(created);
+            return UserMapper.toDto(created);
+        } catch (RuntimeException ex) {
+            keycloakUserProvisioningService.deleteUserQuietly(keycloakUserId);
+            throw ex;
+        }
     }
 
     @Override
@@ -43,6 +66,19 @@ public class UserServiceImpl implements UserService {
     public UserResponseDto get(Long id) {
         return users.findById(id).map(UserMapper::toDto)
                 .orElseThrow(() -> new ResourceNotFoundException("Пользователь", id));
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public UserResponseDto getCurrentUser() {
+        String requesterEmail = getRequesterEmail();
+        if (requesterEmail == null || requesterEmail.isBlank()) {
+            throw new BadRequestException("Не удалось определить текущего пользователя", "CURRENT_USER_NOT_RESOLVED");
+        }
+
+        return users.findByEmailIgnoreCase(requesterEmail)
+                .map(UserMapper::toDto)
+                .orElseThrow(() -> new ResourceNotFoundException("Пользователь", requesterEmail));
     }
 
     @Override
@@ -55,6 +91,8 @@ public class UserServiceImpl implements UserService {
     public UserResponseDto update(Long id, UserUpdateDto dto) {
         var u = users.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Пользователь", id));
+        String oldUsername = u.getUsername();
+        String oldEmail = u.getEmail();
 
         // UI may send partial updates (e.g. only username). Keep existing fields if omitted.
         if (dto.getUsername() == null) dto.setUsername(u.getUsername());
@@ -78,8 +116,19 @@ public class UserServiceImpl implements UserService {
             throw new ResourceAlreadyExistsException("Пользователь", "email", dto.getEmail());
         }
 
+        keycloakUserProvisioningService.updateUserProfile(
+                oldEmail,
+                oldUsername,
+                dto.getUsername(),
+                dto.getEmail(),
+                u.getRole().equals(dto.getRole()) ? null : dto.getRole(),
+                dto.getPassword()
+        );
+
         UserMapper.update(dto, u);
-        return UserMapper.toDto(users.save(u));
+        User updated = users.save(u);
+        searchIndexingService.indexUser(updated);
+        return UserMapper.toDto(updated);
     }
 
     @Override
@@ -106,8 +155,9 @@ public class UserServiceImpl implements UserService {
         }
         user.setAvatarContentType(contentType);
         user.setAvatarFileName(file.getOriginalFilename());
-
-        return UserMapper.toDto(users.save(user));
+        User updated = users.save(user);
+        searchIndexingService.indexUser(updated);
+        return UserMapper.toDto(updated);
     }
 
     @Override
@@ -135,14 +185,61 @@ public class UserServiceImpl implements UserService {
         user.setAvatarData(null);
         user.setAvatarContentType(null);
         user.setAvatarFileName(null);
-        users.save(user);
+        User updated = users.save(user);
+        searchIndexingService.indexUser(updated);
     }
 
     @Override
     public void delete(Long id) {
-        if (!users.existsById(id)) {
-            throw new ResourceNotFoundException("Пользователь", id);
-        }
+        User user = users.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Пользователь", id));
+        keycloakUserProvisioningService.deleteUserByProfileQuietly(user.getEmail(), user.getUsername());
         users.deleteById(id);
+        searchIndexingService.removeUser(id);
+    }
+
+    @Override
+    public void updatePassword(Long id, UserPasswordUpdateDto dto) {
+        if (dto == null || dto.getPassword() == null || dto.getPassword().isBlank()) {
+            throw new BadRequestException("Пароль обязателен", "PASSWORD_REQUIRED");
+        }
+        User user = users.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Пользователь", id));
+
+        if (!canChangePasswordForUser(user)) {
+            throw new BadRequestException("Недостаточно прав для смены пароля", "PASSWORD_CHANGE_FORBIDDEN");
+        }
+
+        keycloakUserProvisioningService.resetPasswordByProfile(user.getEmail(), user.getUsername(), dto.getPassword());
+    }
+
+    private boolean canChangePasswordForUser(User target) {
+        Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+        if (auth == null) return false;
+
+        String requesterEmail = getRequesterEmail(auth);
+
+        boolean isSuperAdmin = auth.getAuthorities().stream()
+                .anyMatch(a -> "ROLE_SUPERADMIN".equals(a.getAuthority()));
+        // Fallback: в некоторых потоках роль SUPERADMIN есть только в нашей БД, а не в JWT authorities.
+        if (!isSuperAdmin && requesterEmail != null) {
+            isSuperAdmin = users.findByEmailIgnoreCase(requesterEmail)
+                    .map(u -> "SUPERADMIN".equalsIgnoreCase(u.getRole()) || "SUPER_ADMIN".equalsIgnoreCase(u.getRole()))
+                    .orElse(false);
+        }
+        if (isSuperAdmin) return true;
+
+        return requesterEmail != null && requesterEmail.equalsIgnoreCase(target.getEmail());
+    }
+
+    private String getRequesterEmail() {
+        return getRequesterEmail(SecurityContextHolder.getContext().getAuthentication());
+    }
+
+    private String getRequesterEmail(Authentication auth) {
+        if (auth instanceof JwtAuthenticationToken jwt) {
+            return jwt.getToken().getClaimAsString("email");
+        }
+        return null;
     }
 }

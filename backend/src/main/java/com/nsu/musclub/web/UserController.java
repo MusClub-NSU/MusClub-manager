@@ -35,6 +35,11 @@ public class UserController {
         return service.get(id);
     }
 
+    @GetMapping("/me")
+    public UserResponseDto getCurrentUser() {
+        return service.getCurrentUser();
+    }
+
     @GetMapping
     public Page<UserResponseDto> list(@ParameterObject Pageable pageable) {
         return service.list(pageable);
@@ -43,6 +48,12 @@ public class UserController {
     @PutMapping("/{id}")
     public UserResponseDto update(@PathVariable Long id, @RequestBody @Valid UserUpdateDto dto) {
         return service.update(id, dto);
+    }
+
+    @PutMapping("/{id}/password")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    public void updatePassword(@PathVariable Long id, @RequestBody @Valid UserPasswordUpdateDto dto) {
+        service.updatePassword(id, dto);
     }
 
     @PostMapping(value = "/{id}/avatar", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)

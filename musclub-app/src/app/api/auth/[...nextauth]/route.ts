@@ -1,29 +1,6 @@
 import NextAuth from 'next-auth';
-import CredentialsProvider from 'next-auth/providers/credentials';
+import KeycloakProvider from 'next-auth/providers/keycloak';
 import { JWT } from 'next-auth/jwt';
-
-type KeycloakTokenResponse = {
-    access_token: string;
-    refresh_token?: string;
-    expires_in: number;
-};
-
-type KeycloakUserInfo = {
-    sub?: string;
-    email?: string;
-    name?: string;
-    preferred_username?: string;
-};
-
-type AuthUser = {
-    id: string;
-    name?: string | null;
-    email?: string | null;
-    username?: string | null;
-    accessToken: string;
-    refreshToken?: string;
-    accessTokenExpires: number;
-};
 
 function parseJwtPayload(token: string): Record<string, unknown> {
     const parts = token.split('.');
@@ -37,56 +14,31 @@ function parseJwtPayload(token: string): Record<string, unknown> {
     return JSON.parse(decoded) as Record<string, unknown>;
 }
 
-async function requestTokenByPassword(username: string, password: string): Promise<KeycloakTokenResponse | null> {
-    const issuer = process.env.KEYCLOAK_ISSUER;
-    const clientId = process.env.KEYCLOAK_CLIENT_ID;
-
-    if (!issuer || !clientId) {
-        return null;
+function getRealmRoles(accessToken?: string): string[] {
+    if (!accessToken) {
+        return [];
     }
 
-    const url = `${issuer}/protocol/openid-connect/token`;
-    const body = new URLSearchParams({
-        grant_type: 'password',
-        client_id: clientId,
-        username,
-        password,
-    });
-
-    if (process.env.KEYCLOAK_CLIENT_SECRET) {
-        body.set('client_secret', process.env.KEYCLOAK_CLIENT_SECRET);
+    const payload = parseJwtPayload(accessToken);
+    const realmAccess = payload.realm_access;
+    if (!realmAccess || typeof realmAccess !== 'object' || !('roles' in realmAccess)) {
+        return [];
     }
 
-    const response = await fetch(url, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-        body,
-    });
-
-    if (!response.ok) {
-        return null;
+    const roles = (realmAccess as { roles?: unknown }).roles;
+    if (!Array.isArray(roles)) {
+        return [];
     }
 
-    return (await response.json()) as KeycloakTokenResponse;
+    return roles.filter((role): role is string => typeof role === 'string');
 }
 
-async function requestUserInfo(accessToken: string): Promise<KeycloakUserInfo | null> {
-    const issuer = process.env.KEYCLOAK_ISSUER;
-    if (!issuer) {
-        return null;
-    }
+function getPublicIssuer(): string {
+    return process.env.KEYCLOAK_ISSUER ?? '';
+}
 
-    const response = await fetch(`${issuer}/protocol/openid-connect/userinfo`, {
-        headers: {
-            Authorization: `Bearer ${accessToken}`,
-        },
-    });
-
-    if (!response.ok) {
-        return null;
-    }
-
-    return (await response.json()) as KeycloakUserInfo;
+function getInternalIssuer(): string {
+    return process.env.KEYCLOAK_INTERNAL_ISSUER ?? getPublicIssuer();
 }
 
 /**
@@ -94,7 +46,7 @@ async function requestUserInfo(accessToken: string): Promise<KeycloakUserInfo | 
  */
 async function refreshAccessToken(token: JWT): Promise<JWT> {
     try {
-        const url = `${process.env.KEYCLOAK_ISSUER}/protocol/openid-connect/token`;
+        const url = `${getInternalIssuer()}/protocol/openid-connect/token`;
         const body = new URLSearchParams({
             client_id: process.env.KEYCLOAK_CLIENT_ID!,
             grant_type: 'refresh_token',
@@ -118,6 +70,7 @@ async function refreshAccessToken(token: JWT): Promise<JWT> {
             ...token,
             accessToken: refreshed.access_token,
             accessTokenExpires: Date.now() + refreshed.expires_in * 1000,
+            roles: getRealmRoles(refreshed.access_token),
             refreshToken: refreshed.refresh_token ?? token.refreshToken,
         };
     } catch {
@@ -127,85 +80,51 @@ async function refreshAccessToken(token: JWT): Promise<JWT> {
 
 const handler = NextAuth({
     providers: [
-        CredentialsProvider({
-            name: 'Credentials',
-            credentials: {
-                username: { label: 'Username', type: 'text' },
-                password: { label: 'Password', type: 'password' },
+        KeycloakProvider({
+            clientId: process.env.KEYCLOAK_CLIENT_ID ?? '',
+            clientSecret: process.env.KEYCLOAK_CLIENT_SECRET ?? '',
+            issuer: getPublicIssuer(),
+            // In containers, NextAuth server cannot resolve localhost:8180.
+            // Use internal discovery URL, but keep public issuer for browser redirects/token validation.
+            wellKnown: `${getInternalIssuer()}/.well-known/openid-configuration`,
+            authorization: {
+                url: `${getPublicIssuer()}/protocol/openid-connect/auth`,
+                params: { scope: 'openid profile email' },
             },
-            async authorize(credentials) {
-                const username = credentials?.username?.trim();
-                const password = credentials?.password;
-
-                if (!username || !password) {
-                    return null;
-                }
-
-                const tokenResponse = await requestTokenByPassword(username, password);
-                if (!tokenResponse?.access_token) {
-                    return null;
-                }
-
-                const userInfo = await requestUserInfo(tokenResponse.access_token);
-                const payload = parseJwtPayload(tokenResponse.access_token);
-
-                const id = String(
-                    userInfo?.sub ??
-                    payload.sub ??
-                    username
-                );
-
-                const name =
-                    userInfo?.name ??
-                    (typeof payload.name === 'string' ? payload.name : null) ??
-                    username;
-
-                const email =
-                    userInfo?.email ??
-                    (typeof payload.email === 'string' ? payload.email : null) ??
-                    null;
-
-                const resolvedUsername =
-                    userInfo?.preferred_username ??
-                    (typeof payload.preferred_username === 'string' ? payload.preferred_username : null) ??
-                    username;
-
-                const user: AuthUser = {
-                    id,
-                    name,
-                    email,
-                    username: resolvedUsername,
-                    accessToken: tokenResponse.access_token,
-                    refreshToken: tokenResponse.refresh_token,
-                    accessTokenExpires: Date.now() + tokenResponse.expires_in * 1000,
-                };
-
-                return user as never;
-            },
+            token: `${getInternalIssuer()}/protocol/openid-connect/token`,
+            userinfo: `${getInternalIssuer()}/protocol/openid-connect/userinfo`,
+            client: process.env.KEYCLOAK_CLIENT_SECRET
+                ? undefined
+                : { token_endpoint_auth_method: 'none' },
         }),
     ],
+    secret: process.env.NEXTAUTH_SECRET,
     pages: {
         signIn: '/login',
     },
     callbacks: {
         async jwt({ token, account, user }) {
-            // Первый вход через Credentials
-            if (account?.provider === 'credentials' && user) {
-                const authUser = user as unknown as AuthUser;
+            if (account?.provider === 'keycloak' && account.access_token) {
+                const payload = parseJwtPayload(account.access_token);
                 return {
                     ...token,
-                    accessToken: authUser.accessToken,
-                    refreshToken: authUser.refreshToken,
-                    accessTokenExpires: authUser.accessTokenExpires,
-                    sub: authUser.id,
-                    name: authUser.name,
-                    email: authUser.email,
-                    preferred_username: authUser.username,
+                    accessToken: account.access_token,
+                    idToken: account.id_token,
+                    refreshToken: account.refresh_token,
+                    accessTokenExpires: (account.expires_at ?? 0) * 1000,
+                    roles: getRealmRoles(account.access_token),
+                    sub: user?.id ?? token.sub,
+                    name: user?.name ?? token.name,
+                    email: user?.email ?? token.email,
+                    preferred_username:
+                        (typeof payload.preferred_username === 'string' ? payload.preferred_username : null) ??
+                        user?.name ??
+                        token.preferred_username,
                 };
             }
 
             // Токен ещё действителен
-            if (Date.now() < (token.accessTokenExpires as number)) {
+            if (token.accessToken && Date.now() < (token.accessTokenExpires as number)) {
                 return token;
             }
 
@@ -215,6 +134,10 @@ const handler = NextAuth({
         async session({ session, token }) {
             session.accessToken = token.accessToken as string;
             session.error = token.error as string | undefined;
+            session.user.roles = (token.roles as string[] | undefined) ?? [];
+            session.user.username = token.preferred_username as string | undefined;
+            session.user.profileId = token.profileId as number | undefined;
+            session.user.backendRole = token.backendRole as string | undefined;
             if (session.user) {
                 session.user.name = (token.name as string) || session.user.name;
                 session.user.email = (token.email as string) || session.user.email;

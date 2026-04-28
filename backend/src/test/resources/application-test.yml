@@ -22,3 +22,10 @@ deepseek:
   api-key: test-api-key-for-testing-only
   model: deepseek-chat
 
+search:
+  embedding-dimensions: 256
+  hybrid:
+    lexical-weight: 0.65
+    vector-weight: 0.35
+    min-vector-score: 0.15
+

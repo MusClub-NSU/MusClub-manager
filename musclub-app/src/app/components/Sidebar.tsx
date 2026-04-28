@@ -1,20 +1,112 @@
 'use client';
 
-import { Drawer, DrawerItem } from '@gravity-ui/navigation';
+import { useEffect, useState } from 'react';
 import { Button, Icon, Text } from '@gravity-ui/uikit';
-import { Bars, Persons, Calendar, House, ArrowRightFromSquare } from '@gravity-ui/icons';
+import { Bars, Persons, Calendar, House, ArrowRightFromSquare, Xmark } from '@gravity-ui/icons';
 import Link from 'next/link';
+import { usePathname } from 'next/navigation';
 import '@gravity-ui/uikit/styles/styles.css';
 import { useSidebar } from '../context/SidebarContext';
-import { useSession, signOut } from 'next-auth/react';
+import { useSession } from 'next-auth/react';
+import { logoutFromKeycloak } from '@/lib/auth';
+import { useCurrentUserRole } from '@/hooks/useCurrentUserRole';
+
+type MenuItem = {
+    href: string;
+    label: string;
+    icon: typeof House;
+    matchPrefix?: string;
+};
 
 export default function Sidebar() {
     const { visible, setVisible, disabled } = useSidebar();
     const { data: session } = useSession();
+    const pathname = usePathname();
+    const { currentUser } = useCurrentUserRole();
+    const [drawerWidth, setDrawerWidth] = useState(300);
+    const [isResizing, setIsResizing] = useState(false);
+    const [resizeStart, setResizeStart] = useState<{ startX: number; startWidth: number } | null>(null);
+
+    const getDefaultWidth = () => {
+        if (typeof window === 'undefined') return 320;
+        return Math.round(window.innerWidth * 0.2);
+    };
+
+    const clampWidth = (width: number) => {
+        if (typeof window === 'undefined') return width;
+        const min = Math.max(260, Math.round(window.innerWidth * 0.16));
+        const max = Math.max(420, Math.round(window.innerWidth * 0.32));
+        return Math.max(min, Math.min(max, width));
+    };
+
+    useEffect(() => {
+        if (typeof window === 'undefined') return;
+        // Базовая ширина — 1/5 экрана
+        setDrawerWidth(clampWidth(getDefaultWidth()));
+    }, []);
+
+    const profileHref = currentUser ? `/participants/${currentUser.id}` : '/participants';
+
+    useEffect(() => {
+        if (!isResizing || !resizeStart) return;
+
+        const onMouseMove = (event: MouseEvent) => {
+            // Небольшой шаг изменения для более "динамического" ощущения
+            const delta = (event.clientX - resizeStart.startX) * 0.5;
+            setDrawerWidth(clampWidth(Math.round(resizeStart.startWidth + delta)));
+        };
+
+        const onMouseUp = () => {
+            setIsResizing(false);
+            setResizeStart(null);
+        };
+
+        document.body.style.userSelect = 'none';
+        window.addEventListener('mousemove', onMouseMove);
+        window.addEventListener('mouseup', onMouseUp);
+
+        return () => {
+            document.body.style.userSelect = '';
+            window.removeEventListener('mousemove', onMouseMove);
+            window.removeEventListener('mouseup', onMouseUp);
+        };
+    }, [isResizing, resizeStart]);
+
+    useEffect(() => {
+        if (typeof window === 'undefined') return;
+        const onResize = () => {
+            setDrawerWidth((prev) => clampWidth(prev));
+        };
+
+        window.addEventListener('resize', onResize);
+        return () => window.removeEventListener('resize', onResize);
+    }, []);
 
     const toggleDrawer = () => {
         if (!disabled) setVisible(!visible);
     };
+
+    const menuItems: MenuItem[] = [
+        { href: '/', label: 'Главная', icon: House },
+        ...(session
+            ? [
+                  { href: '/participants', label: 'Участники', icon: Persons, matchPrefix: '/participants' },
+                  { href: '/events', label: 'Мероприятия', icon: Calendar, matchPrefix: '/events' },
+              ]
+            : []),
+    ];
+
+    const isItemActive = (item: MenuItem) => {
+        if (!pathname) return false;
+        if (item.href === '/') return pathname === '/';
+        return pathname === item.href || pathname.startsWith(`${item.matchPrefix ?? item.href}/`);
+    };
+
+    const getNavItemStyle = (active: boolean) => ({
+        background: active ? 'rgba(37, 99, 235, 0.16)' : 'transparent',
+        color: active ? 'rgb(37, 99, 235)' : 'var(--foreground)',
+        border: active ? '1px solid rgba(37, 99, 235, 0.35)' : '1px solid transparent',
+    });
 
     return (
         <>
@@ -35,12 +127,17 @@ export default function Sidebar() {
             <Button
                 view="flat"
                 onClick={toggleDrawer}
+                aria-label={visible ? 'Скрыть меню навигации' : 'Показать меню навигации'}
+                className="sidebar-toggle-button"
                 style={{
                     position: 'fixed',
                     top: 12,
                     left: 12,
                     zIndex: 2000,
-                    borderRadius: '8px',
+                    width: 44,
+                    height: 44,
+                    padding: 0,
+                    display: visible ? 'none' : 'inline-flex',
                     opacity: disabled ? 0.5 : 1,
                     pointerEvents: disabled ? 'none' : 'auto',
                 }}
@@ -48,106 +145,160 @@ export default function Sidebar() {
                 <Icon data={Bars} size={24} />
             </Button>
 
-            <Drawer onVeilClick={() => setVisible(false)} hideVeil>
-                <DrawerItem
-                    id="main-drawer"
-                    visible={visible}
-                    direction="left"
-                    width={340}
+            <aside
+                aria-hidden={!visible}
+                style={{
+                    position: 'fixed',
+                    top: 0,
+                    left: 0,
+                    bottom: 0,
+                    width: drawerWidth,
+                    maxWidth: '100vw',
+                    zIndex: 1500,
+                    background: 'var(--background)',
+                    borderRight: '1px solid rgba(128, 128, 128, 0.25)',
+                    boxShadow: '4px 0 12px rgba(0,0,0,0.35)',
+                    transform: visible ? 'translateX(0)' : 'translateX(-100%)',
+                    transition: isResizing ? 'none' : 'transform 160ms ease, width 140ms ease-out',
+                    pointerEvents: visible ? 'auto' : 'none',
+                }}
+            >
+                <div
                     style={{
-                        zIndex: 1500,
-                        boxShadow: '4px 0 12px rgba(0,0,0,0.4)',
+                        padding: '16px 20px 20px',
+                        display: 'flex',
+                        flexDirection: 'column',
+                        gap: '16px',
+                        height: '100%',
+                        overflowY: 'auto',
                     }}
                 >
-                    <div
-                        style={{
-                            padding: '24px',
-                            display: 'flex',
-                            flexDirection: 'column',
-                            gap: '16px',
-                            height: '100%',
-                        }}
-                    >
-                        <h2 style={{ marginBottom: '8px' }}>MusClub</h2>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8 }}>
+                            <div className="sidebar-brand-wrap">
+                                <h2 className="sidebar-brand-title">MusClub</h2>
+                            </div>
+                            <Button
+                                view="flat"
+                                size="s"
+                                aria-label="Закрыть меню"
+                                onClick={() => setVisible(false)}
+                            >
+                                <Icon data={Xmark} size={18} />
+                            </Button>
+                        </div>
 
                         {/* Информация о пользователе */}
                         {session?.user && (
-                            <div style={{
-                                padding: '12px',
-                                borderRadius: '8px',
-                                background: 'rgba(0,0,0,0.05)',
-                                marginBottom: '8px',
-                            }}>
-                                <Text variant="subheader-2">{session.user.name}</Text>
-                                <br />
-                                <Text color="secondary" variant="caption-2">{session.user.email}</Text>
-                            </div>
+                            <Link
+                                href={profileHref}
+                                onClick={() => setVisible(false)}
+                                className="sidebar-account-card"
+                                style={{
+                                    display: 'block',
+                                    textDecoration: 'none',
+                                    marginBottom: '8px',
+                                    borderRadius: '10px',
+                                    border: '1px solid rgba(37, 99, 235, 0.22)',
+                                    background: 'rgba(37, 99, 235, 0.08)',
+                                    padding: '12px',
+                                }}
+                            >
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                                    <div
+                                        aria-hidden
+                                        style={{
+                                            width: '34px',
+                                            height: '34px',
+                                            borderRadius: '999px',
+                                            background: 'rgba(37, 99, 235, 0.2)',
+                                            color: 'rgb(37, 99, 235)',
+                                            display: 'flex',
+                                            alignItems: 'center',
+                                            justifyContent: 'center',
+                                            fontWeight: 700,
+                                            flexShrink: 0,
+                                        }}
+                                    >
+                                        {(session.user.name?.[0] ?? session.user.email?.[0] ?? 'U').toUpperCase()}
+                                    </div>
+                                    <div style={{ minWidth: 0, flex: 1 }}>
+                                        <Text
+                                            variant="subheader-2"
+                                            style={{
+                                                display: 'block',
+                                                whiteSpace: 'nowrap',
+                                                overflow: 'hidden',
+                                                textOverflow: 'ellipsis',
+                                                lineHeight: 1.2,
+                                            }}
+                                        >
+                                            {session.user.name || 'Пользователь'}
+                                        </Text>
+                                        <Text
+                                            color="secondary"
+                                            variant="caption-2"
+                                            style={{
+                                                display: 'block',
+                                                marginTop: '2px',
+                                                whiteSpace: 'nowrap',
+                                                overflow: 'hidden',
+                                                textOverflow: 'ellipsis',
+                                                lineHeight: 1.2,
+                                            }}
+                                        >
+                                            {session.user.email}
+                                        </Text>
+                                        <Text
+                                            variant="caption-2"
+                                            style={{
+                                                display: 'block',
+                                                color: 'rgb(37, 99, 235)',
+                                                marginTop: '6px',
+                                                fontWeight: 600,
+                                                lineHeight: 1.2,
+                                            }}
+                                        >
+                                            Перейти в профиль
+                                        </Text>
+                                    </div>
+                                </div>
+                            </Link>
                         )}
 
                         <nav
+                            aria-label="Основная навигация"
                             style={{
                                 display: 'flex',
                                 flexDirection: 'column',
-                                gap: '12px',
+                                gap: '10px',
                             }}
                         >
-                            <Link
-                                href="/"
-                                onClick={() => setVisible(false)}
-                                style={{
-                                    display: 'flex',
-                                    alignItems: 'center',
-                                    gap: '10px',
-                                    textDecoration: 'none',
-                                    fontSize: '18px',
-                                    padding: '8px 12px',
-                                    borderRadius: '8px',
-                                    transition: 'background 0.2s',
-                                }}
-                            >
-                                <Icon data={House} size={20} />
-                                Главная
-                            </Link>
-
-                            {session && (
-                                <>
+                            {menuItems.map((item) => {
+                                const isActive = isItemActive(item);
+                                return (
                                     <Link
-                                        href="/participants"
+                                        key={item.href}
+                                        href={item.href}
                                         onClick={() => setVisible(false)}
+                                        aria-current={isActive ? 'page' : undefined}
+                                        className={`sidebar-nav-link${isActive ? ' sidebar-nav-link-active' : ''}`}
                                         style={{
                                             display: 'flex',
                                             alignItems: 'center',
                                             gap: '10px',
                                             textDecoration: 'none',
-                                            fontSize: '18px',
-                                            padding: '8px 12px',
-                                            borderRadius: '8px',
-                                            transition: 'background 0.2s',
+                                            fontSize: '17px',
+                                            padding: '10px 12px',
+                                            borderRadius: '10px',
+                                            minHeight: '44px',
+                                            ...getNavItemStyle(isActive),
                                         }}
                                     >
-                                        <Icon data={Persons} size={20} />
-                                        Участники
+                                        <Icon data={item.icon} size={20} />
+                                        {item.label}
                                     </Link>
-
-                                    <Link
-                                        href="/events"
-                                        onClick={() => setVisible(false)}
-                                        style={{
-                                            display: 'flex',
-                                            alignItems: 'center',
-                                            gap: '10px',
-                                            textDecoration: 'none',
-                                            fontSize: '18px',
-                                            padding: '8px 12px',
-                                            borderRadius: '8px',
-                                            transition: 'background 0.2s',
-                                        }}
-                                    >
-                                        <Icon data={Calendar} size={20} />
-                                        Мероприятия
-                                    </Link>
-                                </>
-                            )}
+                                );
+                            })}
                         </nav>
 
                         <div style={{ marginTop: 'auto', display: 'flex', flexDirection: 'column', gap: '8px' }}>
@@ -155,7 +306,7 @@ export default function Sidebar() {
                                 <Button
                                     view="outlined-danger"
                                     width="max"
-                                    onClick={() => signOut({ callbackUrl: '/' })}
+                                    onClick={() => void logoutFromKeycloak({ callbackUrl: '/' })}
                                 >
                                     <Icon data={ArrowRightFromSquare} size={16} />
                                     Выйти
@@ -165,9 +316,19 @@ export default function Sidebar() {
                                 © MusClub App
                             </Text>
                         </div>
-                    </div>
-                </DrawerItem>
-            </Drawer>
+                </div>
+                <div
+                    className="sidebar-resize-handle"
+                    role="presentation"
+                    aria-hidden
+                    onMouseDown={(event) => {
+                        event.preventDefault();
+                        setResizeStart({ startX: event.clientX, startWidth: drawerWidth });
+                        setIsResizing(true);
+                    }}
+                    onDoubleClick={() => setDrawerWidth(clampWidth(getDefaultWidth()))}
+                />
+            </aside>
         </>
     );
 }
