@@ -230,16 +230,21 @@ export default function EventsPage() {
                     : events
                 ).map((item) => {
                     const isSearchItem = 'entityId' in item;
-                    const event = isSearchItem ? null : (item as Event);
-                    const result = isSearchItem ? (item as SearchResult) : null;
-                    const eventId = isSearchItem ? result.entityId : event!.id;
-                    const matchedEvent = isSearchItem ? events.find((e) => e.id === result.entityId) : null;
+                    const event = isSearchItem ? undefined : (item as Event);
+                    const result = isSearchItem ? (item as SearchResult) : undefined;
+                    const eventId = result?.entityId ?? event?.id;
 
-                    const title = isSearchItem ? (matchedEvent?.title ?? result.title) : event!.title;
+                    if (!eventId) {
+                        return null;
+                    }
+
+                    const matchedEvent = result ? events.find((e) => e.id === result.entityId) : null;
+
+                    const title = result ? (matchedEvent?.title ?? result.title) : event?.title;
                     const description = isSearchItem
-                        ? (matchedEvent?.description ?? result.snippet)
-                        : event!.description;
-                    const startTime = isSearchItem ? (matchedEvent?.startTime ?? null) : event!.startTime;
+                        ? (matchedEvent?.description ?? result?.snippet)
+                        : event?.description;
+                    const startTime = result ? (matchedEvent?.startTime ?? null) : event?.startTime;
                     const dateTime = startTime ? formatDateTime(startTime) : null;
                     const venue = isSearchItem ? matchedEvent?.venue : event?.venue;
 

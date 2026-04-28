@@ -6,10 +6,12 @@ services:
       POSTGRES_DB: musclub
       POSTGRES_USER: musclub
       POSTGRES_PASSWORD: musclub
+      PGDATA: /var/lib/postgresql/data/pgdata
     ports:
       - "5433:5432"
     volumes:
-      - db_data:/var/lib/postgresql/data
+      - ./data/postgres:/var/lib/postgresql/data
+      - ./docker/postgres/init:/docker-entrypoint-initdb.d:ro
     healthcheck:
       test: [ "CMD-SHELL", "pg_isready -U musclub -d musclub" ]
       interval: 5s
@@ -24,16 +26,17 @@ services:
       KEYCLOAK_ADMIN: admin
       KEYCLOAK_ADMIN_PASSWORD: admin
       KC_DB: postgres
-      KC_DB_URL: jdbc:postgresql://db:5432/musclub
+      KC_DB_URL: jdbc:postgresql://db:5432/keycloak
       KC_DB_USERNAME: musclub
       KC_DB_PASSWORD: musclub
       KC_HTTP_PORT: 8180
+      KC_HOSTNAME: localhost
       KC_HOSTNAME_STRICT: "false"
       KC_HOSTNAME_STRICT_HTTPS: "false"
     ports:
       - "8180:8180"
     volumes:
-      - ./keycloak:/opt/keycloak/data/import
+      - ./keycloak:/opt/keycloak/data/import:ro
     depends_on:
       db:
         condition: service_healthy
@@ -52,10 +55,14 @@ services:
       SPRING_DATASOURCE_URL: jdbc:postgresql://db:5432/musclub
       SPRING_DATASOURCE_USERNAME: musclub
       SPRING_DATASOURCE_PASSWORD: musclub
-      KEYCLOAK_ISSUER_URI: http://keycloak:8180/realms/musclub
+      KEYCLOAK_ISSUER_URI: http://localhost:8180/realms/musclub
+      SPRING_SECURITY_OAUTH2_RESOURCESERVER_JWT_JWK_SET_URI: http://keycloak:8180/realms/musclub/protocol/openid-connect/certs
       KEYCLOAK_BASE_URL: http://keycloak:8180
-      VAPID_PUBLIC_KEY: BLrkc-3gcvpo4V6OkpBm1X9qsQ_O8qYVERu8F6ybBKX_FAmFooYJ-Dj-1oS7BT9W4bLKLOYESYc-hQiSHAphYjE
-      VAPID_PRIVATE_KEY: HWOmlHHey5cQt0d6vNbS-X-gF4jb1h28mr8sAq7d1FY
+      KEYCLOAK_ADMIN_USERNAME: admin
+      KEYCLOAK_ADMIN_PASSWORD: admin
+      VAPID_PUBLIC_KEY: ""
+      VAPID_PRIVATE_KEY: ""
+      DEEPSEEK_API_KEY: ""
     ports:
       - "8080:8080"
     depends_on:
@@ -63,8 +70,30 @@ services:
         condition: service_healthy
       keycloak:
         condition: service_healthy
-    volumes:
-      - ./src:/app/src
 
-volumes:
-  db_data:
+  frontend:
+    build:
+      context: ../musclub-app
+      dockerfile: Dockerfile
+      args:
+        BACKEND_INTERNAL_URL: http://app:8080
+    container_name: musclub_frontend
+    environment:
+      NEXTAUTH_URL: http://localhost:3000
+      NEXTAUTH_SECRET: local-demo-secret-change-me
+      KEYCLOAK_ISSUER: http://localhost:8180/realms/musclub
+      KEYCLOAK_INTERNAL_ISSUER: http://keycloak:8180/realms/musclub
+      KEYCLOAK_CLIENT_ID: musclub-frontend
+      BACKEND_INTERNAL_URL: http://app:8080
+    ports:
+      - "3000:3000"
+    depends_on:
+      app:
+        condition: service_started
+      keycloak:
+        condition: service_healthy
+    healthcheck:
+      test: [ "CMD-SHELL", "wget -q -O /dev/null http://127.0.0.1:3000 || exit 1" ]
+      interval: 10s
+      timeout: 5s
+      retries: 12

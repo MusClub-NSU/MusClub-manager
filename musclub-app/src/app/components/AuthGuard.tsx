@@ -1,9 +1,10 @@
 'use client';
 
-import { signOut, useSession } from 'next-auth/react';
+import { useSession } from 'next-auth/react';
 import { Loader, Text } from '@gravity-ui/uikit';
 import { useEffect, useRef } from 'react';
 import { usePathname, useRouter } from 'next/navigation';
+import { logoutFromKeycloak } from '@/lib/auth';
 
 export default function AuthGuard({ children }: { children: React.ReactNode }) {
     const { data: session, status } = useSession();
@@ -23,10 +24,10 @@ export default function AuthGuard({ children }: { children: React.ReactNode }) {
     useEffect(() => {
         // Refresh не удался: сессия всё ещё "authenticated", но токен битый.
         // Нельзя только router.replace на /login — страница входа снова уведёт на главную → бесконечный цикл.
-        // Сбрасываем сессию (cookies) и открываем логин.
+        // Сбрасываем локальную сессию и завершаем сессию Keycloak, чтобы повторный вход был предсказуемым.
         if (session?.error === 'RefreshAccessTokenError' && !signOutStarted.current) {
             signOutStarted.current = true;
-            void signOut({
+            void logoutFromKeycloak({
                 callbackUrl: `/login?callbackUrl=${encodeURIComponent(pathname || '/')}`,
             });
         }

@@ -129,6 +129,10 @@ class ApiClient {
     return this.request<User>(`/users/${id}`);
   }
 
+  async getCurrentUser(): Promise<User> {
+    return this.request<User>('/users/me');
+  }
+
   async createUser(user: UserCreateDto): Promise<User> {
     return this.request<User>('/users', {
       method: 'POST',

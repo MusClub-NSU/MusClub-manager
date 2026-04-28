@@ -24,7 +24,7 @@ import java.util.Set;
 
 @Service
 public class KeycloakUserProvisioningServiceImpl implements KeycloakUserProvisioningService {
-    private static final Set<String> MANAGED_REALM_ROLES = Set.of("MEMBER", "ORGANIZER");
+    private static final Set<String> MANAGED_REALM_ROLES = Set.of("MEMBER", "ORGANIZER", "SUPERADMIN");
     private final HttpClient httpClient;
     private final ObjectMapper objectMapper;
 

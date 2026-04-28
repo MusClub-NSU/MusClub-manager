@@ -65,6 +65,8 @@ coverage/
 
 ### Docker / runtime ###
 docker-data/
+data/postgres/
+!data/postgres/.gitignore
 *.pid
 *.sock
 

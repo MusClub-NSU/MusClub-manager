@@ -2,52 +2,49 @@
 
 import { useState, useEffect } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { signIn, signOut, useSession } from 'next-auth/react';
+import { signIn, useSession } from 'next-auth/react';
 import { Button, Card, Loader, Text } from '@gravity-ui/uikit';
+import { logoutFromKeycloak } from '@/lib/auth';
+
+function resolveLoginError(error: string | null): string | null {
+    switch (error) {
+        case 'OAuthSignin':
+        case 'OAuthCallback':
+        case 'OAuthCreateAccount':
+            return 'Не удалось завершить вход через Keycloak. Попробуйте ещё раз.';
+        case 'AccessDenied':
+            return 'Keycloak отклонил вход для этого пользователя.';
+        case 'RefreshAccessTokenError':
+            return 'Сессия истекла. Войдите ещё раз.';
+        default:
+            return null;
+    }
+}
 
 export default function LoginPage() {
     const router = useRouter();
     const searchParams = useSearchParams();
     const { status, data: session } = useSession();
 
-    const [username, setUsername] = useState('');
-    const [password, setPassword] = useState('');
-    const [error, setError] = useState<string | null>(null);
     const [isSubmitting, setIsSubmitting] = useState(false);
 
     const callbackUrl = searchParams.get('callbackUrl') || '/';
+    const loginError = resolveLoginError(searchParams.get('error'));
 
     // Переносим навигацию в useEffect, чтобы не вызывать router во время render
     useEffect(() => {
         if (status !== 'authenticated') return;
         // Иначе цикл: login → главная → снова login при битом refresh
         if (session?.error === 'RefreshAccessTokenError') {
-            void signOut({ redirect: false });
+            void logoutFromKeycloak({ callbackUrl: '/login' });
             return;
         }
         router.replace(callbackUrl);
     }, [status, session?.error, callbackUrl, router]);
 
-    const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
-        e.preventDefault();
-        setError(null);
+    const handleLogin = async () => {
         setIsSubmitting(true);
-
-        const result = await signIn('credentials', {
-            redirect: false,
-            username,
-            password,
-            callbackUrl,
-        });
-
-        setIsSubmitting(false);
-
-        if (!result || result.error) {
-            setError('Неверный логин или пароль');
-            return;
-        }
-
-        router.push(result.url || callbackUrl);
+        await signIn('keycloak', { callbackUrl });
     };
 
     // Во время проверки сессии показываем загрузку
@@ -78,50 +75,32 @@ export default function LoginPage() {
         <main className="flex min-h-screen items-center justify-center p-4">
             <Card className="w-full max-w-md p-6">
                 <h1 className="mb-2 text-2xl font-bold">Вход в MusClub Manager</h1>
-                <Text color="secondary">Введите логин и пароль</Text>
+                <Text color="secondary">
+                    Вход выполняется через Keycloak. После авторизации вы автоматически вернётесь в приложение.
+                </Text>
 
-                <form className="mt-6 flex flex-col gap-4" onSubmit={handleSubmit}>
-                    <label className="flex flex-col gap-1">
-                        <span className="text-sm">Логин</span>
-                        <input
-                            type="text"
-                            autoComplete="username"
-                            value={username}
-                            onChange={(e) => setUsername(e.target.value)}
-                            className="w-full rounded-md border border-[--g-color-line-generic] bg-[--g-color-base-background] px-3 py-2"
-                            required
-                        />
-                    </label>
-
-                    <label className="flex flex-col gap-1">
-                        <span className="text-sm">Пароль</span>
-                        <input
-                            type="password"
-                            autoComplete="current-password"
-                            value={password}
-                            onChange={(e) => setPassword(e.target.value)}
-                            className="w-full rounded-md border border-[--g-color-line-generic] bg-[--g-color-base-background] px-3 py-2"
-                            required
-                        />
-                    </label>
-
-                    {error && (
+                <div className="mt-6 flex flex-col gap-4">
+                    {loginError && (
                         <div className="rounded-md bg-red-50 px-3 py-2 text-sm text-red-700">
-                            {error}
+                            {loginError}
                         </div>
                     )}
 
-                    <Button type="submit" view="action" size="l" disabled={isSubmitting}>
+                    <Button type="button" view="action" size="l" disabled={isSubmitting} onClick={handleLogin}>
                         {isSubmitting ? (
                             <span className="flex items-center gap-2">
                                 <Loader size="s" />
-                                Входим...
+                                Перенаправляем в Keycloak...
                             </span>
                         ) : (
-                            'Войти'
+                            'Войти через Keycloak'
                         )}
                     </Button>
-                </form>
+
+                    <Text variant="body-2" color="secondary">
+                        Если сессия уже активна в Keycloak, вход выполнится без повторного ввода пароля.
+                    </Text>
+                </div>
             </Card>
         </main>
     );

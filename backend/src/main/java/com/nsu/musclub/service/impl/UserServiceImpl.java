@@ -70,6 +70,19 @@ public class UserServiceImpl implements UserService {
 
     @Override
     @Transactional(readOnly = true)
+    public UserResponseDto getCurrentUser() {
+        String requesterEmail = getRequesterEmail();
+        if (requesterEmail == null || requesterEmail.isBlank()) {
+            throw new BadRequestException("Не удалось определить текущего пользователя", "CURRENT_USER_NOT_RESOLVED");
+        }
+
+        return users.findByEmailIgnoreCase(requesterEmail)
+                .map(UserMapper::toDto)
+                .orElseThrow(() -> new ResourceNotFoundException("Пользователь", requesterEmail));
+    }
+
+    @Override
+    @Transactional(readOnly = true)
     public Page<UserResponseDto> list(Pageable pageable) {
         return users.findAll(pageable).map(UserMapper::toDto);
     }
@@ -204,10 +217,7 @@ public class UserServiceImpl implements UserService {
         Authentication auth = SecurityContextHolder.getContext().getAuthentication();
         if (auth == null) return false;
 
-        String requesterEmail = null;
-        if (auth instanceof JwtAuthenticationToken jwt) {
-            requesterEmail = jwt.getToken().getClaimAsString("email");
-        }
+        String requesterEmail = getRequesterEmail(auth);
 
         boolean isSuperAdmin = auth.getAuthorities().stream()
                 .anyMatch(a -> "ROLE_SUPERADMIN".equals(a.getAuthority()));
@@ -220,5 +230,16 @@ public class UserServiceImpl implements UserService {
         if (isSuperAdmin) return true;
 
         return requesterEmail != null && requesterEmail.equalsIgnoreCase(target.getEmail());
+    }
+
+    private String getRequesterEmail() {
+        return getRequesterEmail(SecurityContextHolder.getContext().getAuthentication());
+    }
+
+    private String getRequesterEmail(Authentication auth) {
+        if (auth instanceof JwtAuthenticationToken jwt) {
+            return jwt.getToken().getClaimAsString("email");
+        }
+        return null;
     }
 }

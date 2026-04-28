@@ -10,6 +10,8 @@ public interface UserService {
 
     UserResponseDto get(Long id);
 
+    UserResponseDto getCurrentUser();
+
     Page<UserResponseDto> list(Pageable pageable);
 
     UserResponseDto update(Long id, UserUpdateDto dto);

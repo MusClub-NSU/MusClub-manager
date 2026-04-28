@@ -1,14 +1,15 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Button, Icon, Text } from '@gravity-ui/uikit';
 import { Bars, Persons, Calendar, House, ArrowRightFromSquare, Xmark } from '@gravity-ui/icons';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import '@gravity-ui/uikit/styles/styles.css';
 import { useSidebar } from '../context/SidebarContext';
-import { useSession, signOut } from 'next-auth/react';
-import { useUsers } from '@/hooks/useApi';
+import { useSession } from 'next-auth/react';
+import { logoutFromKeycloak } from '@/lib/auth';
+import { useCurrentUserRole } from '@/hooks/useCurrentUserRole';
 
 type MenuItem = {
     href: string;
@@ -21,7 +22,7 @@ export default function Sidebar() {
     const { visible, setVisible, disabled } = useSidebar();
     const { data: session } = useSession();
     const pathname = usePathname();
-    const { users } = useUsers({ page: 0, size: 999 });
+    const { currentUser } = useCurrentUserRole();
     const [drawerWidth, setDrawerWidth] = useState(300);
     const [isResizing, setIsResizing] = useState(false);
     const [resizeStart, setResizeStart] = useState<{ startX: number; startWidth: number } | null>(null);
@@ -43,12 +44,6 @@ export default function Sidebar() {
         // Базовая ширина — 1/5 экрана
         setDrawerWidth(clampWidth(getDefaultWidth()));
     }, []);
-
-    const currentUser = useMemo(() => {
-        const email = session?.user?.email?.toLowerCase();
-        if (!email) return undefined;
-        return users.find((u) => u.email.toLowerCase() === email);
-    }, [session?.user?.email, users]);
 
     const profileHref = currentUser ? `/participants/${currentUser.id}` : '/participants';
 
@@ -311,7 +306,7 @@ export default function Sidebar() {
                                 <Button
                                     view="outlined-danger"
                                     width="max"
-                                    onClick={() => signOut({ callbackUrl: '/' })}
+                                    onClick={() => void logoutFromKeycloak({ callbackUrl: '/' })}
                                 >
                                     <Icon data={ArrowRightFromSquare} size={16} />
                                     Выйти

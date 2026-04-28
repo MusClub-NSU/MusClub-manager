@@ -35,6 +35,11 @@ public class UserController {
         return service.get(id);
     }
 
+    @GetMapping("/me")
+    public UserResponseDto getCurrentUser() {
+        return service.getCurrentUser();
+    }
+
     @GetMapping
     public Page<UserResponseDto> list(@ParameterObject Pageable pageable) {
         return service.list(pageable);
