@@ -62,8 +62,6 @@ services:
       KEYCLOAK_BASE_URL: http://keycloak:8180
       KEYCLOAK_ADMIN_USERNAME: admin
       KEYCLOAK_ADMIN_PASSWORD: admin
-      VAPID_PUBLIC_KEY: ""
-      VAPID_PRIVATE_KEY: ""
     ports:
       - "8080:8080"
     depends_on:

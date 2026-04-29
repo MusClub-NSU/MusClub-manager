@@ -4,7 +4,7 @@ import { Card, Button, Icon, Text, Loader } from '@gravity-ui/uikit';
 import { Bookmark, HandPointRight, Plus, Pencil, TrashBin, Xmark } from '@gravity-ui/icons';
 import React, { useEffect, useState } from 'react';
 import { useSidebar } from '../context/SidebarContext';
-import { useEvents, useHybridSearch } from '../../hooks/useApi';
+import { syncAllMainDataCaches, useEvents, useHybridSearch } from '../../hooks/useApi';
 import { Event, SearchResult } from '../../types/api';
 import { useRouter } from 'next/navigation';
 import { useCurrentUserRole } from '../../hooks/useCurrentUserRole';
@@ -12,7 +12,7 @@ import { useCurrentUserRole } from '../../hooks/useCurrentUserRole';
 export default function EventsPage() {
     const { visible, setDisabled } = useSidebar();
     const { canManageEvents } = useCurrentUserRole();
-    const { events, loading, error, createEvent, updateEvent, deleteEvent } = useEvents({ page: 0, size: 20 });
+    const { events, loading, error, createEvent, updateEvent, deleteEvent, refetch } = useEvents({ page: 0, size: 20 });
     const { results: searchResults, loading: searchLoading, error: searchError, search } = useHybridSearch();
     const [searchQuery, setSearchQuery] = useState('');
     const [isCreating, setIsCreating] = useState(false);
@@ -25,6 +25,13 @@ export default function EventsPage() {
         venue: ''
     });
     const router = useRouter();
+    const handleSyncAll = async () => {
+        try {
+            await syncAllMainDataCaches();
+        } catch {
+            await refetch();
+        }
+    };
 
     useEffect(() => {
         const timeout = setTimeout(() => {
@@ -126,7 +133,7 @@ export default function EventsPage() {
         };
     };
 
-    if (loading) {
+    if (loading && events.length === 0) {
         return (
             <div className="flex items-center justify-center min-h-screen p-4">
                 <div className="flex flex-col items-center gap-4">
@@ -137,7 +144,7 @@ export default function EventsPage() {
         );
     }
 
-    if (error) {
+    if (error && events.length === 0) {
         return (
             <div className="flex items-center justify-center min-h-screen p-4">
                 <Card className="p-6 max-w-md">
@@ -163,20 +170,25 @@ export default function EventsPage() {
                 <div>
                     <h1 className="text-5xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent mb-1">Мероприятия</h1>
                 </div>
-                {canManageEvents && (
-                    <Button
-                        view="action"
-                        onClick={handleCreateEvent}
-                        disabled={isCreating || visible}
-                        size="l"
-                        className="px-6 py-3 bg-gradient-to-r from-blue-600 to-blue-500 hover:from-blue-700 hover:to-blue-600 text-white font-semibold shadow-lg hover:shadow-xl transition-all duration-200"
-                    >
-                        <span className="flex items-center justify-center gap-2">
-                            <Icon data={Plus} size={18} />
-                            <span>Добавить мероприятие</span>
-                        </span>
+                <div className="flex items-center gap-2">
+                    <Button view="outlined" size="l" onClick={() => void handleSyncAll()} loading={loading} disabled={visible} aria-label="Обновить данные" title="Обновить данные">
+                        ↻
                     </Button>
-                )}
+                    {canManageEvents && (
+                        <Button
+                            view="action"
+                            onClick={handleCreateEvent}
+                            disabled={isCreating || visible}
+                            size="l"
+                            className="px-6 py-3 bg-gradient-to-r from-blue-600 to-blue-500 hover:from-blue-700 hover:to-blue-600 text-white font-semibold shadow-lg hover:shadow-xl transition-all duration-200"
+                        >
+                            <span className="flex items-center justify-center gap-2">
+                                <Icon data={Plus} size={18} />
+                                <span>Добавить мероприятие</span>
+                            </span>
+                        </Button>
+                    )}
+                </div>
             </div>
 
             {/* Поиск */}

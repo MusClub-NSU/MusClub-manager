@@ -7,7 +7,11 @@ function getPublicIssuer() {
 
 export async function GET(request: NextRequest) {
     const callbackUrlParam = request.nextUrl.searchParams.get('callbackUrl') ?? '/';
-    const callbackUrl = new URL(callbackUrlParam, request.nextUrl.origin).toString();
+    // В docker `request.nextUrl.origin` может быть `http://0.0.0.0:3000`, а Keycloak разрешает только `NEXTAUTH_URL` (обычно `http://localhost:3000`).
+    // Поэтому строим origin из `NEXTAUTH_URL`, чтобы `post_logout_redirect_uri` точно совпадал с allowed в realm.
+    const nextAuthUrl = process.env.NEXTAUTH_URL;
+    const origin = nextAuthUrl ? new URL(nextAuthUrl).origin : request.nextUrl.origin;
+    const callbackUrl = new URL(callbackUrlParam, origin).toString();
     const publicIssuer = getPublicIssuer();
 
     if (!publicIssuer) {

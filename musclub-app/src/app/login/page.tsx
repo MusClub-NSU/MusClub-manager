@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, type FormEvent } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { signIn, useSession } from 'next-auth/react';
 import { Button, Card, Loader, Text } from '@gravity-ui/uikit';
@@ -8,6 +8,8 @@ import { logoutFromKeycloak } from '@/lib/auth';
 
 function resolveLoginError(error: string | null): string | null {
     switch (error) {
+        case 'CredentialsSignin':
+            return 'Неверный логин или пароль.';
         case 'OAuthSignin':
         case 'OAuthCallback':
         case 'OAuthCreateAccount':
@@ -27,6 +29,7 @@ export default function LoginPage() {
     const { status, data: session } = useSession();
 
     const [isSubmitting, setIsSubmitting] = useState(false);
+    const [formError, setFormError] = useState<string | null>(null);
 
     const callbackUrl = searchParams.get('callbackUrl') || '/';
     const loginError = resolveLoginError(searchParams.get('error'));
@@ -42,9 +45,26 @@ export default function LoginPage() {
         router.replace(callbackUrl);
     }, [status, session?.error, callbackUrl, router]);
 
-    const handleLogin = async () => {
+    const [username, setUsername] = useState('');
+    const [password, setPassword] = useState('');
+
+    const handleSubmit = async (e: FormEvent) => {
+        e.preventDefault();
         setIsSubmitting(true);
-        await signIn('keycloak', { callbackUrl });
+        setFormError(null);
+
+        const res = await signIn('credentials', {
+            username,
+            password,
+            redirect: false,
+        });
+
+        setIsSubmitting(false);
+
+        if (res?.error) {
+            // У CredentialsProvider ошибки обычно приходят как CredentialsSignin.
+            setFormError(resolveLoginError(res.error) ?? 'Не удалось войти. Попробуйте ещё раз.');
+        }
     };
 
     // Во время проверки сессии показываем загрузку
@@ -75,32 +95,53 @@ export default function LoginPage() {
         <main className="flex min-h-screen items-center justify-center p-4">
             <Card className="w-full max-w-md p-6">
                 <h1 className="mb-2 text-2xl font-bold">Вход в MusClub Manager</h1>
-                <Text color="secondary">
-                    Вход выполняется через Keycloak. После авторизации вы автоматически вернётесь в приложение.
-                </Text>
-
-                <div className="mt-6 flex flex-col gap-4">
+                <form onSubmit={handleSubmit} className="mt-6 flex flex-col gap-4">
                     {loginError && (
                         <div className="rounded-md bg-red-50 px-3 py-2 text-sm text-red-700">
                             {loginError}
                         </div>
                     )}
+                    {formError && (
+                        <div className="rounded-md bg-red-50 px-3 py-2 text-sm text-red-700">
+                            {formError}
+                        </div>
+                    )}
 
-                    <Button type="button" view="action" size="l" disabled={isSubmitting} onClick={handleLogin}>
+                    <div>
+                        <label className="block text-sm font-medium mb-2">Логин</label>
+                        <input
+                            type="text"
+                            value={username}
+                            onChange={(e) => setUsername(e.target.value)}
+                            className="w-full px-4 py-2 border border-[--foreground]/20 rounded-lg bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-blue-500"
+                            autoComplete="username"
+                            required
+                        />
+                    </div>
+
+                    <div>
+                        <label className="block text-sm font-medium mb-2">Пароль</label>
+                        <input
+                            type="password"
+                            value={password}
+                            onChange={(e) => setPassword(e.target.value)}
+                            className="w-full px-4 py-2 border border-[--foreground]/20 rounded-lg bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-blue-500"
+                            autoComplete="current-password"
+                            required
+                        />
+                    </div>
+
+                    <Button type="submit" view="action" size="l" disabled={isSubmitting}>
                         {isSubmitting ? (
                             <span className="flex items-center gap-2">
                                 <Loader size="s" />
-                                Перенаправляем в Keycloak...
+                                Выполняем вход...
                             </span>
                         ) : (
-                            'Войти через Keycloak'
+                            'Войти'
                         )}
                     </Button>
-
-                    <Text variant="body-2" color="secondary">
-                        Если сессия уже активна в Keycloak, вход выполнится без повторного ввода пароля.
-                    </Text>
-                </div>
+                </form>
             </Card>
         </main>
     );

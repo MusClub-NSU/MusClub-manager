@@ -3,7 +3,8 @@
  */
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
+import { getSession, useSession } from 'next-auth/react';
 
 // По умолчанию используем относительный "/api/*" (Next.js proxy -> backend через rewrites).
 // Можно переопределить через:
@@ -15,11 +16,7 @@ const API_BASE_URL =
       (process.env.NEXT_PUBLIC_API_URL || '/api')
     : (process.env.NEXT_PUBLIC_API_URL || '/api');
 
-/** Временная константа userId для авто-подписки (пока без авторизации) */
-const DEFAULT_USER_ID = 1;
-
-/** Глобальный флаг, чтобы не дублировать авто-подписку при нескольких экземплярах хука */
-let globalHasAttemptedAutoSubscribe = false;
+type MaybeNumber = number | undefined;
 
 /** Формирует полный URL для push API (с учётом /api в пути) */
 function getPushApiUrl(endpoint: string): string {
@@ -34,6 +31,21 @@ const API_HEADERS: HeadersInit = {
   'Content-Type': 'application/json',
   'ngrok-skip-browser-warning': 'true'
 };
+
+async function getAuthorizedHeaders(extraHeaders: HeadersInit = {}): Promise<HeadersInit> {
+  const session = await getSession();
+  const authHeaders: Record<string, string> = {};
+
+  if (session?.accessToken) {
+    authHeaders.Authorization = `Bearer ${session.accessToken}`;
+  }
+
+  return {
+    ...API_HEADERS,
+    ...authHeaders,
+    ...extraHeaders,
+  };
+}
 
 interface PushSubscriptionState {
   isSupported: boolean;
@@ -80,7 +92,9 @@ function urlBase64ToUint8Array(base64String: string): Uint8Array {
   return outputArray;
 }
 
-export function usePushNotifications(): UsePushNotificationsReturn {
+export function usePushNotifications(userId?: MaybeNumber): UsePushNotificationsReturn {
+  const hasAttemptedAutoSubscribe = useRef(false);
+  const { status: authStatus } = useSession();
   const [state, setState] = useState<PushSubscriptionState>({
     isSupported: false,
     isSubscribed: false,
@@ -91,6 +105,10 @@ export function usePushNotifications(): UsePushNotificationsReturn {
 
   // Проверка поддержки push-уведомлений
   useEffect(() => {
+    if (authStatus !== 'authenticated') {
+      return;
+    }
+
     const checkSupport = async () => {
       // Минимум: Service Worker и Notifications API (PushManager проверяется при подписке)
       const hasServiceWorker = typeof navigator !== 'undefined' && 'serviceWorker' in navigator;
@@ -143,24 +161,24 @@ export function usePushNotifications(): UsePushNotificationsReturn {
         }
         const subscription = await pushManager.getSubscription();
         
-        // Если есть подписка в браузере, проверяем, сохранена ли она на сервере
-        if (subscription) {
+        // Если есть подписка в браузере и известен userId — проверяем, сохранена ли она на сервере
+        if (subscription && userId) {
           try {
-            const checkUrl = getPushApiUrl(`subscriptions/${DEFAULT_USER_ID}`);
-            const checkResponse = await fetch(checkUrl, { headers: API_HEADERS });
+            const checkUrl = getPushApiUrl(`subscriptions/${userId}`);
+            const checkResponse = await fetch(checkUrl, { headers: await getAuthorizedHeaders() });
             if (checkResponse.ok) {
               const serverSubscriptions = await checkResponse.json().catch(() => []);
-              const isOnServer = Array.isArray(serverSubscriptions) && 
+              const isOnServer = Array.isArray(serverSubscriptions) &&
                 serverSubscriptions.some((sub: { endpoint?: string }) => sub.endpoint === subscription.endpoint);
-              
+
               if (!isOnServer) {
                 // Подписка есть в браузере, но не на сервере - синхронизируем
                 console.log('[Push] Subscription exists in browser but not on server, syncing...');
                 const syncResponse = await fetch(getPushApiUrl('subscribe'), {
                   method: 'POST',
-                  headers: API_HEADERS,
+                  headers: await getAuthorizedHeaders(),
                   body: JSON.stringify({
-                    userId: DEFAULT_USER_ID,
+                    userId: userId,
                     endpoint: subscription.endpoint,
                     p256dh: arrayBufferToBase64Url(subscription.getKey('p256dh')),
                     auth: arrayBufferToBase64Url(subscription.getKey('auth')),
@@ -197,7 +215,7 @@ export function usePushNotifications(): UsePushNotificationsReturn {
     };
 
     checkSupport();
-  }, []);
+  }, [userId, authStatus]);
 
   // Регистрация service worker для push
   const registerServiceWorker = useCallback(async (): Promise<ServiceWorkerRegistration> => {
@@ -226,7 +244,7 @@ export function usePushNotifications(): UsePushNotificationsReturn {
   // Получение VAPID ключа с сервера
   const getVapidPublicKey = useCallback(async (): Promise<string> => {
     try {
-      const response = await fetch(getPushApiUrl('vapid-public-key'), { headers: API_HEADERS });
+      const response = await fetch(getPushApiUrl('vapid-public-key'), { headers: await getAuthorizedHeaders() });
       if (!response.ok) {
         const contentType = response.headers.get('content-type') || '';
         if (contentType.includes('application/json')) {
@@ -271,15 +289,31 @@ export function usePushNotifications(): UsePushNotificationsReturn {
 
       // Подписываемся на push
       const applicationServerKey = urlBase64ToUint8Array(vapidPublicKey);
+      const existingSubscription = await registration.pushManager.getSubscription();
+      if (existingSubscription) {
+        // Важно при смене аккаунта: снимаем прошлую подписку в браузере и на backend.
+        await fetch(getPushApiUrl('unsubscribe'), {
+          method: 'POST',
+          headers: await getAuthorizedHeaders(),
+          body: JSON.stringify({ endpoint: existingSubscription.endpoint }),
+        });
+        await existingSubscription.unsubscribe();
+      }
+
       const subscription = await registration.pushManager.subscribe({
         userVisibleOnly: true,
-        applicationServerKey: applicationServerKey.buffer as ArrayBuffer
+        applicationServerKey: applicationServerKey as unknown as BufferSource
       });
+
+      // В некоторых браузерах после смены ключей/состояния нужна принудительная пересоздача.
+      if (!subscription) {
+        throw new Error('Не удалось получить push-подписку браузера');
+      }
 
       // Отправляем подписку на сервер
       const response = await fetch(getPushApiUrl('subscribe'), {
         method: 'POST',
-        headers: API_HEADERS,
+        headers: await getAuthorizedHeaders(),
         body: JSON.stringify({
           userId: userId,
           endpoint: subscription.endpoint,
@@ -329,12 +363,15 @@ export function usePushNotifications(): UsePushNotificationsReturn {
 
       return true;
     } catch (error) {
-      // Не засоряем консоль "ошибками" в dev, если push endpoint сейчас недоступен.
       console.warn('Push subscription skipped:', error);
+      const detailedMessage =
+        error instanceof Error
+          ? `${error.name}: ${error.message}`
+          : 'Ошибка подписки';
       setState(prev => ({
         ...prev,
         isLoading: false,
-        error: error instanceof Error ? error.message : 'Ошибка подписки'
+        error: detailedMessage
       }));
       return false;
     }
@@ -359,17 +396,24 @@ export function usePushNotifications(): UsePushNotificationsReturn {
 
   // Автоматическая подписка при загрузке (если поддерживается и ещё не подписан)
   useEffect(() => {
+    if (!userId) return;
+    if (authStatus !== 'authenticated') return;
     if (
       state.isSupported &&
       !state.isSubscribed &&
       !state.isLoading &&
       state.permission !== 'denied' &&
-      !globalHasAttemptedAutoSubscribe
+      !hasAttemptedAutoSubscribe.current
     ) {
-      globalHasAttemptedAutoSubscribe = true;
-      subscribe(DEFAULT_USER_ID);
+      hasAttemptedAutoSubscribe.current = true;
+      void subscribe(userId);
     }
-  }, [state.isSupported, state.isSubscribed, state.isLoading, state.permission, subscribe]);
+  }, [userId, authStatus, state.isSupported, state.isSubscribed, state.isLoading, state.permission, subscribe]);
+
+  // При смене аккаунта заново запускаем попытку авто-подписки.
+  useEffect(() => {
+    hasAttemptedAutoSubscribe.current = false;
+  }, [userId]);
 
   // Отписка от push-уведомлений
   const unsubscribe = useCallback(async (): Promise<boolean> => {
@@ -386,7 +430,7 @@ export function usePushNotifications(): UsePushNotificationsReturn {
         // Отменяем подписку на сервере
         await fetch(getPushApiUrl('unsubscribe'), {
           method: 'POST',
-          headers: API_HEADERS,
+          headers: await getAuthorizedHeaders(),
           body: JSON.stringify({
             endpoint: subscription.endpoint
           })
@@ -413,6 +457,10 @@ export function usePushNotifications(): UsePushNotificationsReturn {
   }, []);
 
   const sendTestNotification = useCallback(async () => {
+    if (!userId) {
+      setState((prev) => ({ ...prev, error: 'Не удалось определить текущего пользователя для push-уведомлений' }));
+      return;
+    }
     setState(prev => ({ ...prev, error: null }));
     try {
       const url = getPushApiUrl('send');
@@ -420,9 +468,9 @@ export function usePushNotifications(): UsePushNotificationsReturn {
       
       const response = await fetch(url, {
         method: 'POST',
-        headers: API_HEADERS,
+        headers: await getAuthorizedHeaders(),
         body: JSON.stringify({
-          userId: DEFAULT_USER_ID,
+          userId: userId,
           title: 'MusClub Manager',
           body: 'Push-уведомления работают!'
         })
@@ -451,8 +499,8 @@ export function usePushNotifications(): UsePushNotificationsReturn {
       
       // Проверяем подписки на сервере для отладки
       try {
-        const checkUrl = getPushApiUrl(`subscriptions/${DEFAULT_USER_ID}`);
-        const checkResponse = await fetch(checkUrl, { headers: API_HEADERS });
+        const checkUrl = getPushApiUrl(`subscriptions/${userId}`);
+        const checkResponse = await fetch(checkUrl, { headers: await getAuthorizedHeaders() });
         if (checkResponse.ok) {
           const serverSubscriptions = await checkResponse.json().catch(() => []);
           console.log('[Push] Server subscriptions for user:', serverSubscriptions);
@@ -474,7 +522,7 @@ export function usePushNotifications(): UsePushNotificationsReturn {
         error: `Сеть недоступна: ${e instanceof Error ? e.message : 'Неизвестная ошибка'}. Проверьте интернет и что бэкенд запущен.`
       }));
     }
-  }, []);
+  }, [userId]);
 
   return {
     ...state,

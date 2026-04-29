@@ -1,6 +1,6 @@
 'use client';
 
-import { useUsers, useHybridSearch } from '../../hooks/useApi';
+import { syncAllMainDataCaches, useUsers, useHybridSearch } from '../../hooks/useApi';
 import { Button, Card, Text, Loader, Icon, Link} from '@gravity-ui/uikit';
 import { Plus, Pencil, TrashBin, Xmark } from '@gravity-ui/icons';
 import { useEffect, useState } from 'react';
@@ -29,6 +29,13 @@ export default function ParticipantsPage() {
         role: 'MEMBER',
         password: '',
     });
+    const handleSyncAll = async () => {
+        try {
+            await syncAllMainDataCaches();
+        } catch {
+            await refetch();
+        }
+    };
 
     useEffect(() => {
         const timeout = setTimeout(() => {
@@ -129,7 +136,7 @@ export default function ParticipantsPage() {
     };
 
 
-    if (loading) {
+    if (loading && users.length === 0) {
         return (
             <main className="flex items-center justify-center min-h-screen p-4">
                 <div className="flex flex-col items-center gap-4">
@@ -140,7 +147,7 @@ export default function ParticipantsPage() {
         );
     }
 
-    if (error) {
+    if (error && users.length === 0) {
         return (
             <main className="flex items-center justify-center min-h-screen p-4">
                 <Card className="p-6 max-w-md">
@@ -168,20 +175,25 @@ export default function ParticipantsPage() {
                             Участники
                         </h1>
                     </div>
-                    {canManageUsers && (
-                        <Button
-                            view="action"
-                            onClick={handleCreateUser}
-                            disabled={isCreating || sidebarVisible}
-                            size="l"
-                            className="px-6 py-3 bg-gradient-to-r from-blue-600 to-blue-500 hover:from-blue-700 hover:to-blue-600 text-white font-semibold shadow-lg hover:shadow-xl transition-all duration-200"
-                        >
-                            <span className="flex items-center justify-center gap-2">
-                                <Icon data={Plus} size={18} />
-                                <span>Добавить участника</span>
-                            </span>
+                    <div className="flex items-center gap-2">
+                        <Button view="outlined" size="l" onClick={() => void handleSyncAll()} loading={loading} disabled={sidebarVisible} aria-label="Обновить данные" title="Обновить данные">
+                            ↻
                         </Button>
-                    )}
+                        {canManageUsers && (
+                            <Button
+                                view="action"
+                                onClick={handleCreateUser}
+                                disabled={isCreating || sidebarVisible}
+                                size="l"
+                                className="px-6 py-3 bg-gradient-to-r from-blue-600 to-blue-500 hover:from-blue-700 hover:to-blue-600 text-white font-semibold shadow-lg hover:shadow-xl transition-all duration-200"
+                            >
+                                <span className="flex items-center justify-center gap-2">
+                                    <Icon data={Plus} size={18} />
+                                    <span>Добавить участника</span>
+                                </span>
+                            </Button>
+                        )}
+                    </div>
                 </div>
 
                 {/* Поиск с красивым дизайном */}

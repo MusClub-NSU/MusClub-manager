@@ -12,15 +12,17 @@ interface PushNotificationSettingsProps {
  * Компонент для отображения статуса push-уведомлений (авто-подписка при загрузке)
  */
 export function PushNotificationSettings({ className = '' }: PushNotificationSettingsProps) {
+  const { canManageEvents, currentUser } = useCurrentUserRole();
   const {
     isSupported,
     isSubscribed,
     isLoading,
     error,
     permission,
+    subscribe,
+    unsubscribe,
     sendTestNotification
-  } = usePushNotifications();
-  const { canManageEvents } = useCurrentUserRole();
+  } = usePushNotifications(currentUser?.id);
 
   if (!isSupported) {
     return (
@@ -67,6 +69,30 @@ export function PushNotificationSettings({ className = '' }: PushNotificationSet
       {error && (
         <div className="mt-3 p-2 rounded text-sm" style={{ backgroundColor: 'rgba(220, 38, 38, 0.12)', color: '#dc2626' }}>
           {error}
+        </div>
+      )}
+
+      {currentUser?.id && (
+        <div className="mt-3 flex flex-wrap gap-3">
+          {!isSubscribed ? (
+            <button
+              onClick={() => void subscribe(currentUser.id)}
+              disabled={isLoading}
+              className="text-sm hover:opacity-80 disabled:opacity-60"
+              style={{ color: 'rgb(37, 99, 235)' }}
+            >
+              {isLoading ? 'Подписываем...' : 'Подписаться на push'}
+            </button>
+          ) : (
+            <button
+              onClick={() => void unsubscribe()}
+              disabled={isLoading}
+              className="text-sm hover:opacity-80 disabled:opacity-60"
+              style={{ color: 'rgb(220, 38, 38)' }}
+            >
+              {isLoading ? 'Обновляем...' : 'Отписаться от push'}
+            </button>
+          )}
         </div>
       )}
 

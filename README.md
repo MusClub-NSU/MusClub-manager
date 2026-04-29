@@ -13,6 +13,7 @@ MusClub Manager - веб-приложение для управления мер
 ### Что нужно
 - Docker Desktop
 - Docker Compose
+- Создать файл backend/.env
 
 ### Один запуск для всего стека
 Из корня репозитория:
@@ -26,6 +27,18 @@ docker compose -f backend/docker-compose.yml up --build
 ```bash
 docker compose up --build
 ```
+###Настройка файла .env
+Для работы генерации текста афиши, необходим добавить в .env файл перменную DEEPSEEK_API_KEY=ВАШ_API_КЛЮЧ
+Для работы пушей нужно:
+	написать в терминале команду npx web-push generate-vapid-keys
+	полученные ключи добавить в переменные в файле .env
+	VAPID_PUBLIC_KEY=ВАШ_PUBLIC_KEY
+	VAPID_PRIVATE_KEY=ВАШ_PRIVATE_KEY
+
+Вид итогового файла .env:
+DEEPSEEK_API_KEY=ВАШ_API_КЛЮЧ
+VAPID_PUBLIC_KEY=ВАШ_PUBLIC_KEY
+VAPID_PRIVATE_KEY=ВАШ_PRIVATE_KEY
 
 После старта будут доступны:
 - Frontend: `http://localhost:3000`

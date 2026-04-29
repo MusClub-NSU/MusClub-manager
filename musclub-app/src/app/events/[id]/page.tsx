@@ -25,6 +25,15 @@ interface ProgramItem {
     notes?: string;
 }
 
+const EVENT_DETAIL_CACHE_TTL_MS = 5 * 60 * 1000;
+
+type EventDetailsCachePayload = {
+    timestamp: number;
+    members: EventMember[];
+    timeline: TimelineEvent[];
+    program: ProgramItem[];
+};
+
 export default function EventDetailsPage() {
     const { id } = useParams();
     const router = useRouter();
@@ -73,6 +82,38 @@ export default function EventDetailsPage() {
     const [isEditing, setIsEditing] = useState(false);
     const event = events.find((e) => e.id === Number(id));
 
+    const getEventDetailsCacheKey = useCallback((eventId: number) => `event-details:${eventId}`, []);
+
+    const readEventDetailsCache = useCallback((eventId: number): EventDetailsCachePayload | null => {
+        if (typeof window === 'undefined') return null;
+        try {
+            const raw = window.localStorage.getItem(getEventDetailsCacheKey(eventId));
+            if (!raw) return null;
+            const parsed = JSON.parse(raw) as EventDetailsCachePayload;
+            if (!parsed?.timestamp) return null;
+            if (Date.now() - parsed.timestamp > EVENT_DETAIL_CACHE_TTL_MS) return null;
+            return parsed;
+        } catch {
+            return null;
+        }
+    }, [getEventDetailsCacheKey]);
+
+    const writeEventDetailsCache = useCallback((eventId: number, next: Partial<EventDetailsCachePayload>) => {
+        if (typeof window === 'undefined') return;
+        try {
+            const prev = readEventDetailsCache(eventId);
+            const payload: EventDetailsCachePayload = {
+                timestamp: Date.now(),
+                members: next.members ?? prev?.members ?? [],
+                timeline: next.timeline ?? prev?.timeline ?? [],
+                program: next.program ?? prev?.program ?? [],
+            };
+            window.localStorage.setItem(getEventDetailsCacheKey(eventId), JSON.stringify(payload));
+        } catch {
+            // no-op
+        }
+    }, [getEventDetailsCacheKey, readEventDetailsCache]);
+
     // Загрузка участников события
     const normalizeTime = (time?: string) => {
         if (!time) return '';
@@ -83,36 +124,40 @@ export default function EventDetailsPage() {
         try {
             setTimelineLoading(true);
             const items = await apiClient.getEventTimeline(eventId);
-            setTimelineEvents(items.map((item) => ({
+            const normalized = items.map((item) => ({
                 id: item.id,
                 time: normalizeTime(item.plannedTime),
                 description: item.description,
-            })));
+            }));
+            setTimelineEvents(normalized);
+            writeEventDetailsCache(eventId, { timeline: normalized });
         } catch (err) {
             console.error('Ошибка загрузки таймплана:', err);
         } finally {
             setTimelineLoading(false);
         }
-    }, []);
+    }, [writeEventDetailsCache]);
 
     const loadProgram = useCallback(async (eventId: number) => {
         try {
             setProgramLoading(true);
             const items = await apiClient.getEventProgram(eventId);
-            setProgramItems(items.map((item) => ({
+            const normalized = items.map((item) => ({
                 id: item.id,
                 title: item.title,
                 artist: item.artist,
                 time: normalizeTime(item.plannedTime),
                 duration: item.durationText,
                 notes: item.notes,
-            })));
+            }));
+            setProgramItems(normalized);
+            writeEventDetailsCache(eventId, { program: normalized });
         } catch (err) {
             console.error('Ошибка загрузки концертной программы:', err);
         } finally {
             setProgramLoading(false);
         }
-    }, []);
+    }, [writeEventDetailsCache]);
 
     const loadEventMembers = useCallback(async () => {
         if (!event?.id) return;
@@ -120,12 +165,13 @@ export default function EventDetailsPage() {
             setMembersLoading(true);
             const members = await apiClient.getEventMembers(event.id);
             setEventMembers(members);
+            writeEventDetailsCache(event.id, { members });
         } catch (err) {
             console.error('Ошибка загрузки участников:', err);
         } finally {
             setMembersLoading(false);
         }
-    }, [event?.id]);
+    }, [event?.id, writeEventDetailsCache]);
 
     useEffect(() => {
         // Сбрасываем состояние при переключении между мероприятиями
@@ -142,11 +188,18 @@ export default function EventDetailsPage() {
         setProgramItems([]);
 
         if (event?.id) {
-            loadEventMembers();
-            loadTimeline(event.id);
-            loadProgram(event.id);
+            const cached = readEventDetailsCache(event.id);
+            if (cached) {
+                setEventMembers(cached.members);
+                setTimelineEvents(cached.timeline);
+                setProgramItems(cached.program);
+            } else {
+                loadEventMembers();
+                loadTimeline(event.id);
+                loadProgram(event.id);
+            }
         }
-    }, [event?.id, loadEventMembers, loadTimeline, loadProgram]);
+    }, [event?.id, loadEventMembers, loadTimeline, loadProgram, readEventDetailsCache]);
 
     // Группировка участников по ролям
     const membersByRole = eventMembers.reduce((acc, member) => {
@@ -174,7 +227,7 @@ export default function EventDetailsPage() {
         endTime: toLocalInputFormat(event?.endTime || ''),
         venue: event?.venue || ''
     });
-    if (loading) {
+    if (loading && !event) {
         return (
             <div className="flex items-center justify-center min-h-screen p-4">
                 <Loader size="l" />
@@ -219,10 +272,23 @@ export default function EventDetailsPage() {
             setAiGenerating(true);
             setAiError(null);
             const response = await apiClient.generatePosterDescription(event.id, saveAiDescription);
-            setAiDescriptionText(response.description);
-            setShowAiModal(true);
             if (saveAiDescription) {
-                await refetch();
+                await updateEvent(event.id, {
+                    title: event.title,
+                    description: response.description,
+                    startTime: event.startTime,
+                    endTime: event.endTime || undefined,
+                    venue: event.venue || undefined,
+                });
+                setEditData((prev) => ({
+                    ...prev,
+                    description: response.description,
+                }));
+                setAiDescriptionText('');
+                setShowAiModal(false);
+            } else {
+                setAiDescriptionText(response.description);
+                setShowAiModal(true);
             }
         } catch (err) {
             setAiError(err instanceof Error ? err.message : 'Не удалось сгенерировать описание для афиши');
@@ -539,14 +605,6 @@ export default function EventDetailsPage() {
                     </p>
                 )}
                 <div className="flex flex-col gap-3">
-                    {event.aiDescription && (
-                        <Card className="p-4 bg-[--g-color-base-generic-hover] border border-[--g-color-line-generic]">
-                            <Text variant="subheader-2" className="font-semibold mb-2">Описание для афиши</Text>
-                            <Text color="secondary" className="whitespace-pre-wrap">
-                                {event.aiDescription}
-                            </Text>
-                        </Card>
-                    )}
                         {canManageEvents && (
                             <div className="flex flex-col sm:flex-row sm:items-center gap-3">
                                 <Button

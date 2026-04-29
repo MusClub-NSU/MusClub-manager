@@ -142,3 +142,10 @@ export interface SearchResult {
   vectorScore: number;
 }
 
+// Типы для push-уведомлений
+export interface PushSendResponse {
+  success: boolean;
+  sentCount: number;
+  message: string;
+}
+

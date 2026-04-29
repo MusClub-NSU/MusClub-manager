@@ -6,10 +6,17 @@ import { Card, Button, Text, Icon, Loader, Select } from '@gravity-ui/uikit';
 import { Person, LogoTelegram, Calendar, Pencil, TrashBin } from '@gravity-ui/icons';
 import { useUsers } from '@/hooks/useApi';
 import { useSidebar } from '../../context/SidebarContext';
-import { PushNotificationSettings } from '../../components/PushNotificationSettings';
 import { apiClient } from '@/lib/api';
 import { useCurrentUserRole } from '@/hooks/useCurrentUserRole';
 import { useSession } from 'next-auth/react';
+import type { User } from '@/types/api';
+
+const USER_DETAIL_CACHE_TTL_MS = 5 * 60 * 1000;
+
+type UserDetailCachePayload = {
+    timestamp: number;
+    user: User;
+};
 
 function formatRole(role?: string) {
     if (role === 'ORGANIZER') return 'Организатор';
@@ -21,13 +28,43 @@ export default function UserDetailsPage() {
     const params = useParams();
     const router = useRouter();
     const { visible } = useSidebar();
-    const { canManageUsers } = useCurrentUserRole();
+    const { canManageUsers, canManageEvents } = useCurrentUserRole();
     const { data: session } = useSession();
     const avatarInputId = useId();
 
     const userId = Number(params.id);
     const { users, loading, error, updateUser, refetch } = useUsers({ page: 0, size: 999 });
-    const user = users.find((u) => u.id === userId);
+    const getUserCacheKey = (id: number) => `user-details:${id}`;
+    const readUserCache = (id: number): User | null => {
+        if (typeof window === 'undefined') return null;
+        try {
+            const raw = window.localStorage.getItem(getUserCacheKey(id));
+            if (!raw) return null;
+            const parsed = JSON.parse(raw) as UserDetailCachePayload;
+            if (!parsed?.timestamp || !parsed?.user) return null;
+            if (Date.now() - parsed.timestamp > USER_DETAIL_CACHE_TTL_MS) return null;
+            return parsed.user;
+        } catch {
+            return null;
+        }
+    };
+    const writeUserCache = (userToCache: User) => {
+        if (typeof window === 'undefined') return;
+        try {
+            const payload: UserDetailCachePayload = {
+                timestamp: Date.now(),
+                user: userToCache,
+            };
+            window.localStorage.setItem(getUserCacheKey(userToCache.id), JSON.stringify(payload));
+        } catch {
+            // no-op
+        }
+    };
+
+    const [cachedUser, setCachedUser] = useState<User | null>(() =>
+        Number.isFinite(userId) ? readUserCache(userId) : null,
+    );
+    const user = users.find((u) => u.id === userId) ?? cachedUser;
 
     const isSelf = !!session?.user?.email && session.user.email === user?.email;
     const canEditProfile = isSelf || canManageUsers;
@@ -36,6 +73,10 @@ export default function UserDetailsPage() {
     const [copiedEmail, setCopiedEmail] = useState(false);
     const [avatarPreview, setAvatarPreview] = useState<string | null>(null);
     const [saveError, setSaveError] = useState<string | null>(null);
+    const [pushSending, setPushSending] = useState(false);
+    const [pushResult, setPushResult] = useState<string | null>(null);
+    const [pushError, setPushError] = useState<string | null>(null);
+    const [pushMessage, setPushMessage] = useState('');
     const [passwordValue, setPasswordValue] = useState('');
     const [passwordSaving, setPasswordSaving] = useState(false);
     const [passwordSaved, setPasswordSaved] = useState(false);
@@ -43,6 +84,8 @@ export default function UserDetailsPage() {
 
     useEffect(() => {
         if (!user) return;
+        writeUserCache(user);
+        setCachedUser(user);
         setEditData({
             username: user.username,
             email: user.email,
@@ -57,7 +100,7 @@ export default function UserDetailsPage() {
         }
     }, [isEditing]);
 
-    if (loading) {
+    if (loading && !user) {
         return (
             <main className="flex justify-center items-center min-h-screen">
                 <Loader size="l" />
@@ -94,13 +137,17 @@ export default function UserDetailsPage() {
 
         try {
             if (canManageUsers) {
-                await updateUser(user.id, {
+                const updatedUser = await updateUser(user.id, {
                     username: editData.username,
                     email: editData.email,
                     role: editData.role,
                 });
+                writeUserCache(updatedUser);
+                setCachedUser(updatedUser);
             } else {
-                await updateUser(user.id, { username: editData.username });
+                const updatedUser = await updateUser(user.id, { username: editData.username });
+                writeUserCache(updatedUser);
+                setCachedUser(updatedUser);
             }
 
             setIsEditing(false);
@@ -151,6 +198,9 @@ export default function UserDetailsPage() {
 
         try {
             await apiClient.uploadUserAvatar(user.id, file);
+            const refreshedUser = await apiClient.getUser(user.id);
+            writeUserCache(refreshedUser);
+            setCachedUser(refreshedUser);
             await refetch();
         } catch (err) {
             console.error('Ошибка загрузки аватара:', err);
@@ -163,6 +213,9 @@ export default function UserDetailsPage() {
         try {
             await apiClient.deleteUserAvatar(user.id);
             setAvatarPreview(null);
+            const refreshedUser = await apiClient.getUser(user.id);
+            writeUserCache(refreshedUser);
+            setCachedUser(refreshedUser);
             await refetch();
         } catch (err) {
             console.error('Ошибка удаления аватара:', err);
@@ -176,6 +229,31 @@ export default function UserDetailsPage() {
             setTimeout(() => setCopiedEmail(false), 1400);
         } catch {
             setCopiedEmail(false);
+        }
+    };
+
+    const handleSendPushToUser = async () => {
+        if (!canManageEvents) return;
+        setPushSending(true);
+        setPushError(null);
+        setPushResult(null);
+
+        try {
+            const res = await apiClient.sendPushToUser(user.id, {
+                title: 'MusClub App',
+                body: pushMessage.trim() || `Уведомление для пользователя ${user.username}`,
+            });
+
+            if (res.sentCount > 0) {
+                setPushResult(res.message);
+            } else {
+                setPushError(res.message);
+            }
+        } catch (err) {
+            const message = err instanceof Error ? err.message : 'Не удалось отправить push-уведомление';
+            setPushError(message);
+        } finally {
+            setPushSending(false);
         }
     };
 
@@ -366,9 +444,49 @@ export default function UserDetailsPage() {
                     </div>
                 </Card>
 
-                <Card className="p-4 rounded-2xl border shadow-sm" style={{ borderColor: 'var(--color-line-generic)' }}>
-                    <PushNotificationSettings />
-                </Card>
+                {canManageEvents && (
+                    <Card className="p-4 rounded-2xl border shadow-sm" style={{ borderColor: 'var(--color-line-generic)' }}>
+                        <div className="flex flex-col gap-3">
+                            <Text variant="subheader-2">Отправить push пользователю</Text>
+                            <Text variant="body-2" color="secondary">
+                                Уведомление придёт только если у пользователя есть активная push-подписка.
+                            </Text>
+
+                            <textarea
+                                value={pushMessage}
+                                onChange={(e) => setPushMessage(e.target.value)}
+                                placeholder="Введите текст уведомления..."
+                                className="w-full min-h-[88px] px-3 py-2 rounded-lg border resize-y"
+                                style={{
+                                    borderColor: 'var(--color-line-generic)',
+                                    backgroundColor: 'var(--color-background-secondary)',
+                                    color: 'var(--color-text-primary)',
+                                }}
+                            />
+
+                            <Button
+                                view="action"
+                                className="mt-1"
+                                onClick={handleSendPushToUser}
+                                disabled={pushSending || visible}
+                            >
+                                {pushSending ? 'Отправляем...' : 'Отправить push'}
+                            </Button>
+
+                            {pushError && (
+                                <Text variant="body-2" color="danger">
+                                    {pushError}
+                                </Text>
+                            )}
+
+                            {pushResult && (
+                                <Text variant="body-2" color="secondary">
+                                    {pushResult}
+                                </Text>
+                            )}
+                        </div>
+                    </Card>
+                )}
 
                 <div className="flex flex-wrap justify-center gap-3">
                     {saveError && (

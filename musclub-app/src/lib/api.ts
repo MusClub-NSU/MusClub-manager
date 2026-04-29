@@ -17,6 +17,7 @@ import {
   EventProgramItem,
   EventProgramItemCreateDto,
   EventProgramItemUpdateDto,
+  PushSendResponse,
   SearchEntityType,
   SearchResult,
 } from '@/types/api';
@@ -238,6 +239,22 @@ class ApiClient {
   async generatePosterDescription(eventId: number, save: boolean = false): Promise<PosterDescriptionResponse> {
     return this.request<PosterDescriptionResponse>(`/events/${eventId}/poster-description/ai?save=${save}`, {
       method: 'POST',
+    });
+  }
+
+  async sendPushToUser(
+    userId: number,
+    message: { title?: string; body?: string; icon?: string; badge?: string } = {},
+  ): Promise<PushSendResponse> {
+    return this.request<PushSendResponse>(`/push/send`, {
+      method: 'POST',
+      body: JSON.stringify({
+        userId,
+        title: message.title,
+        body: message.body,
+        icon: message.icon,
+        badge: message.badge,
+      }),
     });
   }
 

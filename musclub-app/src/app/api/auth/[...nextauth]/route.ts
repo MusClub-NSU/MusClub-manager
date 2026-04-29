@@ -1,5 +1,6 @@
 import NextAuth from 'next-auth';
 import KeycloakProvider from 'next-auth/providers/keycloak';
+import CredentialsProvider from 'next-auth/providers/credentials';
 import { JWT } from 'next-auth/jwt';
 
 function parseJwtPayload(token: string): Record<string, unknown> {
@@ -78,6 +79,52 @@ async function refreshAccessToken(token: JWT): Promise<JWT> {
     }
 }
 
+type TokenResponse = {
+    access_token: string;
+    refresh_token?: string;
+    id_token?: string;
+    expires_in: number;
+    scope?: string;
+};
+
+/**
+ * Логин по логин+пароль через password grant в Keycloak.
+ * Возвращает OIDC-токены, которые далее кладём в JWT NextAuth.
+ */
+async function passwordGrantToKeycloak(username: string, password: string): Promise<TokenResponse> {
+    const tokenUrl = `${getInternalIssuer()}/protocol/openid-connect/token`;
+
+    const body = new URLSearchParams({
+        client_id: process.env.KEYCLOAK_CLIENT_ID!,
+        grant_type: 'password',
+        username,
+        password,
+        scope: 'openid profile email',
+    });
+
+    if (process.env.KEYCLOAK_CLIENT_SECRET) {
+        body.set('client_secret', process.env.KEYCLOAK_CLIENT_SECRET);
+    }
+
+    const response = await fetch(tokenUrl, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        body,
+    });
+
+    const json = (await response.json().catch(() => ({}))) as Partial<TokenResponse> & {
+        error?: string;
+        error_description?: string;
+    };
+
+    if (!response.ok || !json.access_token || !json.expires_in) {
+        // Для UI дальше вернём просто null (CredentialsSignin).
+        throw new Error(json.error_description || json.error || 'Keycloak token request failed');
+    }
+
+    return json as TokenResponse;
+}
+
 const handler = NextAuth({
     providers: [
         KeycloakProvider({
@@ -96,6 +143,48 @@ const handler = NextAuth({
             client: process.env.KEYCLOAK_CLIENT_SECRET
                 ? undefined
                 : { token_endpoint_auth_method: 'none' },
+        }),
+        CredentialsProvider({
+            name: 'Keycloak (password)',
+            credentials: {
+                username: { label: 'Логин', type: 'text' },
+                password: { label: 'Пароль', type: 'password' },
+            },
+            async authorize(credentials, _req) {
+                try {
+                    const username = credentials?.username;
+                    const password = credentials?.password;
+
+                    if (!username || !password) return null;
+
+                    const tokens = await passwordGrantToKeycloak(username, password);
+
+                    const payload = parseJwtPayload(tokens.access_token);
+                    const idPayload = tokens.id_token ? parseJwtPayload(tokens.id_token) : {};
+                    const userId = typeof payload.sub === 'string' ? payload.sub : username;
+
+                    return {
+                        id: userId,
+                        sub: userId,
+                        accessToken: tokens.access_token,
+                        refreshToken: tokens.refresh_token,
+                        idToken: tokens.id_token,
+                        accessTokenExpires: Date.now() + tokens.expires_in * 1000,
+                        roles: getRealmRoles(tokens.access_token),
+                        preferred_username:
+                            (typeof payload.preferred_username === 'string' ? payload.preferred_username : null) ??
+                            (typeof idPayload.preferred_username === 'string' ? idPayload.preferred_username : null) ??
+                            undefined,
+                        name:
+                            (typeof idPayload.name === 'string' ? idPayload.name : null) ??
+                            (typeof idPayload.preferred_username === 'string' ? idPayload.preferred_username : null) ??
+                            undefined,
+                        email: typeof idPayload.email === 'string' ? idPayload.email : undefined,
+                    };
+                } catch {
+                    return null;
+                }
+            },
         }),
     ],
     secret: process.env.NEXTAUTH_SECRET,
@@ -121,6 +210,36 @@ const handler = NextAuth({
                         user?.name ??
                         token.preferred_username,
                 };
+            }
+
+            if (account?.provider === 'credentials' && user) {
+                const credentialsUser = user as unknown as {
+                    sub?: string;
+                    accessToken?: string;
+                    refreshToken?: string;
+                    idToken?: string;
+                    accessTokenExpires?: number;
+                    roles?: string[];
+                    preferred_username?: string;
+                    name?: string;
+                    email?: string;
+                };
+
+                if (credentialsUser.accessToken) {
+                    return {
+                        ...token,
+                        accessToken: credentialsUser.accessToken,
+                        idToken: credentialsUser.idToken,
+                        refreshToken: credentialsUser.refreshToken,
+                        accessTokenExpires: credentialsUser.accessTokenExpires,
+                        roles: credentialsUser.roles,
+                        sub: credentialsUser.sub ?? token.sub,
+                        name: credentialsUser.name ?? token.name,
+                        email: credentialsUser.email ?? token.email,
+                        preferred_username:
+                            credentialsUser.preferred_username ?? token.preferred_username,
+                    };
+                }
             }
 
             // Токен ещё действителен

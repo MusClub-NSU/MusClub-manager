@@ -1,6 +1,6 @@
 'use client';
 
-import { useEvents } from '../hooks/useApi';
+import { syncAllMainDataCaches, useEvents } from '../hooks/useApi';
 import { Card, Text, Loader, Button } from '@gravity-ui/uikit';
 import Link from 'next/link';
 import { useSession } from 'next-auth/react';
@@ -9,9 +9,17 @@ import { useRouter } from 'next/navigation';
 export default function Home() {
     const { data: session } = useSession();
     const router = useRouter();
-    const { events, loading: eventsLoading, error: eventsError } = useEvents({ page: 0, size: 100 });
+    const { events, loading: eventsLoading, error: eventsError, refetch } = useEvents({ page: 0, size: 100 });
 
-    if (eventsLoading) {
+    const handleSyncAll = async () => {
+        try {
+            await syncAllMainDataCaches();
+        } catch {
+            await refetch();
+        }
+    };
+
+    if (eventsLoading && events.length === 0) {
         return (
             <main className="flex items-center justify-center min-h-screen p-4">
                 <div className="flex flex-col items-center gap-4">
@@ -54,9 +62,14 @@ export default function Home() {
                 <Card className="p-6 rounded-xl border shadow-sm" style={{ borderColor: 'var(--color-line-generic)' }}>
                     <div className="flex items-center justify-between gap-4 mb-4">
                         <h2 className="text-2xl font-semibold">Ближайшие мероприятия</h2>
-                        <Text color="secondary" className="text-sm whitespace-nowrap">
-                            {upcomingEvents.length} шт.
-                        </Text>
+                        <div className="flex items-center gap-3">
+                            <Text color="secondary" className="text-sm whitespace-nowrap">
+                                {upcomingEvents.length} шт.
+                            </Text>
+                            <Button view="outlined" size="s" onClick={() => void handleSyncAll()} loading={eventsLoading} aria-label="Обновить данные" title="Обновить данные">
+                                ↻
+                            </Button>
+                        </div>
                     </div>
 
                     {eventsError ? (
