@@ -7,6 +7,7 @@ import com.nsu.musclub.repository.EventRepository;
 import com.nsu.musclub.service.SocialMediaPostAiService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -14,6 +15,7 @@ import org.springframework.web.client.HttpClientErrorException;
 import org.springframework.web.client.HttpServerErrorException;
 import org.springframework.web.server.ResponseStatusException;
 
+import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
 
 /**
@@ -24,17 +26,21 @@ import java.time.format.DateTimeFormatter;
 public class SocialMediaPostAiServiceImpl implements SocialMediaPostAiService {
 
     private static final Logger log = LoggerFactory.getLogger(SocialMediaPostAiServiceImpl.class);
-    private static final DateTimeFormatter DATE_TIME_FORMATTER =
-            DateTimeFormatter.ofPattern("dd.MM.yyyy HH:mm");
-    private static final DateTimeFormatter DATE_FORMATTER =
-            DateTimeFormatter.ofPattern("dd.MM.yyyy");
 
     private final EventRepository eventRepository;
     private final AiTextClient aiTextClient;
+    private final ZoneId displayZone;
+    private final DateTimeFormatter displayDateTimeFormatter;
 
-    public SocialMediaPostAiServiceImpl(EventRepository eventRepository, AiTextClient aiTextClient) {
+    public SocialMediaPostAiServiceImpl(
+            EventRepository eventRepository,
+            AiTextClient aiTextClient,
+            @Value("${musclub.display-timezone:Asia/Novosibirsk}") String displayTimezoneId
+    ) {
         this.eventRepository = eventRepository;
         this.aiTextClient = aiTextClient;
+        this.displayZone = ZoneId.of(displayTimezoneId);
+        this.displayDateTimeFormatter = DateTimeFormatter.ofPattern("dd.MM.yyyy HH:mm").withZone(this.displayZone);
     }
 
     @Override
@@ -152,6 +158,10 @@ public class SocialMediaPostAiServiceImpl implements SocialMediaPostAiService {
         sb.append("- Do not invent facts or details\n");
         sb.append("- Make it engaging and shareable\n");
         sb.append("- Include date, time, and venue if available\n");
+        sb.append("- Start and end times in the event data use timezone ")
+                .append(displayZone.getId())
+                .append("; use them as given, do not convert timezones\n");
+        sb.append("- Do not mention an end time unless an \"End Time:\" line appears in the event data\n");
 
         return sb.toString();
     }
@@ -162,14 +172,18 @@ public class SocialMediaPostAiServiceImpl implements SocialMediaPostAiService {
         sb.append("Title: ").append(event.getTitle()).append("\n");
 
         if (event.getStartTime() != null) {
-            sb.append("Start Time: ")
-                    .append(DATE_TIME_FORMATTER.format(event.getStartTime()))
+            sb.append("Start Time (")
+                    .append(displayZone.getId())
+                    .append("): ")
+                    .append(displayDateTimeFormatter.format(event.getStartTime().toInstant()))
                     .append("\n");
         }
 
         if (event.getEndTime() != null) {
-            sb.append("End Time: ")
-                    .append(DATE_TIME_FORMATTER.format(event.getEndTime()))
+            sb.append("End Time (")
+                    .append(displayZone.getId())
+                    .append("): ")
+                    .append(displayDateTimeFormatter.format(event.getEndTime().toInstant()))
                     .append("\n");
         }
 

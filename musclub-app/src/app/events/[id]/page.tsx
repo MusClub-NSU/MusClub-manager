@@ -120,27 +120,29 @@ export default function EventDetailsPage() {
         return time.slice(0, 5);
     };
 
-    const loadTimeline = useCallback(async (eventId: number) => {
+    const loadTimeline = useCallback(async (eventId: number, opts?: { silent?: boolean }) => {
         try {
-            setTimelineLoading(true);
+            if (!opts?.silent) setTimelineLoading(true);
             const items = await apiClient.getEventTimeline(eventId);
             const normalized = items.map((item) => ({
                 id: item.id,
                 time: normalizeTime(item.plannedTime),
                 description: item.description,
             }));
-            setTimelineEvents(normalized);
+            setTimelineEvents((prev) =>
+                opts?.silent && JSON.stringify(prev) === JSON.stringify(normalized) ? prev : normalized,
+            );
             writeEventDetailsCache(eventId, { timeline: normalized });
         } catch (err) {
             console.error('Ошибка загрузки таймплана:', err);
         } finally {
-            setTimelineLoading(false);
+            if (!opts?.silent) setTimelineLoading(false);
         }
     }, [writeEventDetailsCache]);
 
-    const loadProgram = useCallback(async (eventId: number) => {
+    const loadProgram = useCallback(async (eventId: number, opts?: { silent?: boolean }) => {
         try {
-            setProgramLoading(true);
+            if (!opts?.silent) setProgramLoading(true);
             const items = await apiClient.getEventProgram(eventId);
             const normalized = items.map((item) => ({
                 id: item.id,
@@ -150,28 +152,31 @@ export default function EventDetailsPage() {
                 duration: item.durationText,
                 notes: item.notes,
             }));
-            setProgramItems(normalized);
+            setProgramItems((prev) =>
+                opts?.silent && JSON.stringify(prev) === JSON.stringify(normalized) ? prev : normalized,
+            );
             writeEventDetailsCache(eventId, { program: normalized });
         } catch (err) {
             console.error('Ошибка загрузки концертной программы:', err);
         } finally {
-            setProgramLoading(false);
+            if (!opts?.silent) setProgramLoading(false);
         }
     }, [writeEventDetailsCache]);
 
-    const loadEventMembers = useCallback(async () => {
-        if (!event?.id) return;
+    const loadEventMembers = useCallback(async (eventId: number, opts?: { silent?: boolean }) => {
         try {
-            setMembersLoading(true);
-            const members = await apiClient.getEventMembers(event.id);
-            setEventMembers(members);
-            writeEventDetailsCache(event.id, { members });
+            if (!opts?.silent) setMembersLoading(true);
+            const members = await apiClient.getEventMembers(eventId);
+            setEventMembers((prev) =>
+                opts?.silent && JSON.stringify(prev) === JSON.stringify(members) ? prev : members,
+            );
+            writeEventDetailsCache(eventId, { members });
         } catch (err) {
             console.error('Ошибка загрузки участников:', err);
         } finally {
-            setMembersLoading(false);
+            if (!opts?.silent) setMembersLoading(false);
         }
-    }, [event?.id, writeEventDetailsCache]);
+    }, [writeEventDetailsCache]);
 
     useEffect(() => {
         // Сбрасываем состояние при переключении между мероприятиями
@@ -193,10 +198,15 @@ export default function EventDetailsPage() {
                 setEventMembers(cached.members);
                 setTimelineEvents(cached.timeline);
                 setProgramItems(cached.program);
+                void Promise.all([
+                    loadEventMembers(event.id, { silent: true }),
+                    loadTimeline(event.id, { silent: true }),
+                    loadProgram(event.id, { silent: true }),
+                ]);
             } else {
-                loadEventMembers();
-                loadTimeline(event.id);
-                loadProgram(event.id);
+                void loadEventMembers(event.id);
+                void loadTimeline(event.id);
+                void loadProgram(event.id);
             }
         }
     }, [event?.id, loadEventMembers, loadTimeline, loadProgram, readEventDetailsCache]);
@@ -299,13 +309,12 @@ export default function EventDetailsPage() {
 
     const handleSave = async () => {
         try {
-            // Преобразуем время начала в ISO
             const start = new Date(editData.startTime);
             const startTime = start.toISOString();
 
-            // Автоматически добавляем 2 часа
-            const end = new Date(start.getTime() + 2 * 60 * 60 * 1000);
-            const endTime = end.toISOString();
+            const endTime = editData.endTime?.trim()
+                ? new Date(editData.endTime).toISOString()
+                : undefined;
 
             await updateEvent(event.id, {
                 title: editData.title,
@@ -344,7 +353,7 @@ export default function EventDetailsPage() {
             });
             // Удаляем роль из списка созданных, так как теперь она есть в бекенде
             setCreatedRoles(createdRoles.filter(r => r !== roleName));
-            await loadEventMembers();
+            await loadEventMembers(event.id);
             setSelectedUserId(null);
             setShowAddPerson(null);
             setNewRoleName('');
@@ -358,7 +367,7 @@ export default function EventDetailsPage() {
         if (!event?.id) return;
         try {
             await apiClient.removeEventMember(event.id, userId);
-            await loadEventMembers();
+            await loadEventMembers(event.id);
         } catch (err) {
             console.error('Ошибка удаления участника:', err);
         }
@@ -557,14 +566,27 @@ export default function EventDetailsPage() {
                     <div className="flex items-center gap-2">
                         <Icon data={Clock} size={18} className="sm:w-5 sm:h-5"/>
                         {isEditing ? (
-                            <input
-                                type="datetime-local"
-                                value={editData.startTime}
-                                onChange={(e) =>
-                                    setEditData({...editData, startTime: e.target.value})
-                                }
-                                className="px-2 py-1 sm:px-3 sm:py-2 border rounded-lg bg-[--g-color-base-generic-hover] text-[--g-color-text-primary] text-sm sm:text-base"
-                            />
+                            <div className="flex flex-col sm:flex-row sm:items-center gap-2">
+                                <input
+                                    type="datetime-local"
+                                    value={editData.startTime}
+                                    onChange={(e) =>
+                                        setEditData({ ...editData, startTime: e.target.value })
+                                    }
+                                    className="px-2 py-1 sm:px-3 sm:py-2 border rounded-lg bg-[--g-color-base-generic-hover] text-[--g-color-text-primary] text-sm sm:text-base"
+                                />
+                                <span className="text-xs sm:text-sm text-[var(--g-color-text-secondary)] whitespace-nowrap">
+                                    окончание (необяз.):
+                                </span>
+                                <input
+                                    type="datetime-local"
+                                    value={editData.endTime}
+                                    onChange={(e) =>
+                                        setEditData({ ...editData, endTime: e.target.value })
+                                    }
+                                    className="px-2 py-1 sm:px-3 sm:py-2 border rounded-lg bg-[--g-color-base-generic-hover] text-[--g-color-text-primary] text-sm sm:text-base"
+                                />
+                            </div>
                         ) : (
                             <span>{date} • {time}</span>
                         )}

@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useId, useState } from 'react';
+import { useEffect, useId, useLayoutEffect, useState } from 'react';
 import { useRouter, useParams } from 'next/navigation';
 import { Card, Button, Text, Icon, Loader, Select } from '@gravity-ui/uikit';
 import { Person, LogoTelegram, Calendar, Pencil, TrashBin } from '@gravity-ui/icons';
@@ -22,6 +22,10 @@ function formatRole(role?: string) {
     if (role === 'ORGANIZER') return 'Организатор';
     if (role === 'MEMBER') return 'Участник';
     return 'Не указана';
+}
+
+function usersEqual(a: User, b: User): boolean {
+    return JSON.stringify(a) === JSON.stringify(b);
 }
 
 export default function UserDetailsPage() {
@@ -61,10 +65,13 @@ export default function UserDetailsPage() {
         }
     };
 
-    const [cachedUser, setCachedUser] = useState<User | null>(() =>
+    const [detailUser, setDetailUser] = useState<User | null>(() =>
         Number.isFinite(userId) ? readUserCache(userId) : null,
     );
-    const user = users.find((u) => u.id === userId) ?? cachedUser;
+    const userFromList = users.find((u) => u.id === userId);
+    const detailForRoute =
+        detailUser && detailUser.id === userId ? detailUser : null;
+    const user = detailForRoute ?? userFromList ?? null;
 
     const isSelf = !!session?.user?.email && session.user.email === user?.email;
     const canEditProfile = isSelf || canManageUsers;
@@ -82,10 +89,33 @@ export default function UserDetailsPage() {
     const [passwordSaved, setPasswordSaved] = useState(false);
     const [editData, setEditData] = useState({ username: '', email: '', role: '' });
 
+    useLayoutEffect(() => {
+        if (!Number.isFinite(userId)) return;
+        setDetailUser(readUserCache(userId));
+    }, [userId]);
+
+    useEffect(() => {
+        if (!Number.isFinite(userId)) return;
+        let cancelled = false;
+        void apiClient
+            .getUser(userId)
+            .then((fresh) => {
+                if (cancelled) return;
+                setDetailUser((prev) => {
+                    if (prev && usersEqual(prev, fresh)) return prev;
+                    writeUserCache(fresh);
+                    return fresh;
+                });
+            })
+            .catch(() => {});
+
+        return () => {
+            cancelled = true;
+        };
+    }, [userId]);
+
     useEffect(() => {
         if (!user) return;
-        writeUserCache(user);
-        setCachedUser(user);
         setEditData({
             username: user.username,
             email: user.email,
@@ -143,11 +173,11 @@ export default function UserDetailsPage() {
                     role: editData.role,
                 });
                 writeUserCache(updatedUser);
-                setCachedUser(updatedUser);
+                setDetailUser(updatedUser);
             } else {
                 const updatedUser = await updateUser(user.id, { username: editData.username });
                 writeUserCache(updatedUser);
-                setCachedUser(updatedUser);
+                setDetailUser(updatedUser);
             }
 
             setIsEditing(false);
@@ -200,7 +230,7 @@ export default function UserDetailsPage() {
             await apiClient.uploadUserAvatar(user.id, file);
             const refreshedUser = await apiClient.getUser(user.id);
             writeUserCache(refreshedUser);
-            setCachedUser(refreshedUser);
+            setDetailUser(refreshedUser);
             await refetch();
         } catch (err) {
             console.error('Ошибка загрузки аватара:', err);
@@ -215,7 +245,7 @@ export default function UserDetailsPage() {
             setAvatarPreview(null);
             const refreshedUser = await apiClient.getUser(user.id);
             writeUserCache(refreshedUser);
-            setCachedUser(refreshedUser);
+            setDetailUser(refreshedUser);
             await refetch();
         } catch (err) {
             console.error('Ошибка удаления аватара:', err);

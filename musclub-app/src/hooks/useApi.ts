@@ -98,6 +98,28 @@ function writeEventsCacheForSize(size: number, payload: { content: Event[]; tota
   writeCache(buildCacheKey('events', { page: 0, size }), payload);
 }
 
+function payloadsEqualUsers(
+  a: { content: User[]; totalElements: number; totalPages: number },
+  b: { content: User[]; totalElements: number; totalPages: number },
+): boolean {
+  if (a.totalElements !== b.totalElements || a.totalPages !== b.totalPages) return false;
+  const byId = (x: User, y: User) => x.id - y.id;
+  return (
+    JSON.stringify([...a.content].sort(byId)) === JSON.stringify([...b.content].sort(byId))
+  );
+}
+
+function payloadsEqualEvents(
+  a: { content: Event[]; totalElements: number; totalPages: number },
+  b: { content: Event[]; totalElements: number; totalPages: number },
+): boolean {
+  if (a.totalElements !== b.totalElements || a.totalPages !== b.totalPages) return false;
+  const byId = (x: Event, y: Event) => x.id - y.id;
+  return (
+    JSON.stringify([...a.content].sort(byId)) === JSON.stringify([...b.content].sort(byId))
+  );
+}
+
 function sortEventsByStartTimeDesc(events: Event[]): Event[] {
   return [...events].sort((a, b) => {
     const aTime = a.startTime ? new Date(a.startTime).getTime() : Number.NEGATIVE_INFINITY;
@@ -136,14 +158,15 @@ export function useUsers(pageable?: Pageable) {
       setLoading(true);
       setError(null);
       const response = await apiClient.getUsers(pageable);
-      setUsers(response.content);
-      setTotalElements(response.totalElements);
-      setTotalPages(response.totalPages);
-      writeCache(cacheKey, {
+      const payload = {
         content: response.content,
         totalElements: response.totalElements,
         totalPages: response.totalPages,
-      });
+      };
+      setUsers(payload.content);
+      setTotalElements(payload.totalElements);
+      setTotalPages(payload.totalPages);
+      writeCache(cacheKey, payload);
     } catch (err) {
       const cached = readCache<{ content: User[]; totalElements: number; totalPages: number }>(cacheKey);
       if (cached) {
@@ -159,14 +182,36 @@ export function useUsers(pageable?: Pageable) {
     }
   }, [cacheKey, pageable?.page, pageable?.size, pageable?.sort]);
 
+  /** Фоновое обновление: не трогает loading, обновляет состояние только если данные отличаются от кэша. */
+  const revalidateUsersInBackground = useCallback(async () => {
+    try {
+      const response = await apiClient.getUsers(pageable);
+      const fresh = {
+        content: response.content,
+        totalElements: response.totalElements,
+        totalPages: response.totalPages,
+      };
+      const cached = readCache<{ content: User[]; totalElements: number; totalPages: number }>(cacheKey);
+      if (cached && payloadsEqualUsers(cached, fresh)) return;
+      setUsers(fresh.content);
+      setTotalElements(fresh.totalElements);
+      setTotalPages(fresh.totalPages);
+      writeCache(cacheKey, fresh);
+      setError(null);
+    } catch {
+      // оставляем кэш на экране
+    }
+  }, [cacheKey, pageable?.page, pageable?.size, pageable?.sort]);
+
   useEffect(() => {
     const hasCached = loadUsersFromCache();
     if (!hasCached) {
       void fetchUsers();
     } else {
       setLoading(false);
+      void revalidateUsersInBackground();
     }
-  }, [fetchUsers, loadUsersFromCache]);
+  }, [fetchUsers, loadUsersFromCache, revalidateUsersInBackground]);
 
   useEffect(() => {
     const onCacheUpdated = () => {
@@ -271,14 +316,15 @@ export function useEvents(pageable?: Pageable) {
       setLoading(true);
       setError(null);
       const response = await apiClient.getEvents(pageable);
-      setEvents(sortEventsByStartTimeDesc(response.content));
-      setTotalElements(response.totalElements);
-      setTotalPages(response.totalPages);
-      writeCache(cacheKey, {
+      const payload = {
         content: response.content,
         totalElements: response.totalElements,
         totalPages: response.totalPages,
-      });
+      };
+      setEvents(sortEventsByStartTimeDesc(payload.content));
+      setTotalElements(payload.totalElements);
+      setTotalPages(payload.totalPages);
+      writeCache(cacheKey, payload);
     } catch (err) {
       const cached = readCache<{ content: Event[]; totalElements: number; totalPages: number }>(cacheKey);
       if (cached) {
@@ -294,14 +340,35 @@ export function useEvents(pageable?: Pageable) {
     }
   }, [cacheKey, pageable?.page, pageable?.size, pageable?.sort]);
 
+  const revalidateEventsInBackground = useCallback(async () => {
+    try {
+      const response = await apiClient.getEvents(pageable);
+      const fresh = {
+        content: response.content,
+        totalElements: response.totalElements,
+        totalPages: response.totalPages,
+      };
+      const cached = readCache<{ content: Event[]; totalElements: number; totalPages: number }>(cacheKey);
+      if (cached && payloadsEqualEvents(cached, fresh)) return;
+      setEvents(sortEventsByStartTimeDesc(fresh.content));
+      setTotalElements(fresh.totalElements);
+      setTotalPages(fresh.totalPages);
+      writeCache(cacheKey, fresh);
+      setError(null);
+    } catch {
+      // оставляем кэш
+    }
+  }, [cacheKey, pageable?.page, pageable?.size, pageable?.sort]);
+
   useEffect(() => {
     const hasCached = loadEventsFromCache();
     if (!hasCached) {
       void fetchEvents();
     } else {
       setLoading(false);
+      void revalidateEventsInBackground();
     }
-  }, [fetchEvents, loadEventsFromCache]);
+  }, [fetchEvents, loadEventsFromCache, revalidateEventsInBackground]);
 
   useEffect(() => {
     const onCacheUpdated = () => {

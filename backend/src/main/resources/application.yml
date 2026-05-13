@@ -60,6 +60,10 @@ keycloak:
     username: ${KEYCLOAK_ADMIN_USERNAME:admin}
     password: ${KEYCLOAK_ADMIN_PASSWORD:admin}
 
+# Время в промптах ИИ (афиша, соцсети) показывается в этом поясе — как на афише для зрителей (НСУ / Новосибирск).
+musclub:
+  display-timezone: ${MUSCLUB_DISPLAY_TIMEZONE:Asia/Novosibirsk}
+
 deepseek:
   api-url: https://api.deepseek.com/v1/chat/completions
   api-key: ${DEEPSEEK_API_KEY:test-api-key-for-testing-only}
