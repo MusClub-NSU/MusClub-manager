@@ -38,7 +38,6 @@ services:
       KC_HOSTNAME_STRICT: "false"
       KC_HOSTNAME_STRICT_HTTPS: "false"
       KC_HTTP_RELATIVE_PATH: /auth
-      KC_PROXY: rewrite
     volumes:
       - ./backend/keycloak:/opt/keycloak/data/import:ro
     depends_on:
@@ -63,9 +62,9 @@ services:
       SPRING_DATASOURCE_USERNAME: ${POSTGRES_USER:-musclub}
       SPRING_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD:-musclub}
 
-      SPRING_SECURITY_OAUTH2_RESOURCESERVER_JWT_ISSUER_URI: http://keycloak:8180/auth/realms/${KEYCLOAK_REALM:-musclub}
+      SPRING_SECURITY_OAUTH2_RESOURCESERVER_JWT_ISSUER_URI: ${SERVER_PROTOCOL:-http}://${SERVER_HOST:-localhost}:${HTTP_PORT:-80}/auth/realms/${KEYCLOAK_REALM:-musclub}
       SPRING_SECURITY_OAUTH2_RESOURCESERVER_JWT_JWK_SET_URI: http://keycloak:8180/auth/realms/${KEYCLOAK_REALM:-musclub}/protocol/openid-connect/certs
-      KEYCLOAK_ISSUER_URI: http://keycloak:8180/auth/realms/${KEYCLOAK_REALM:-musclub}
+      KEYCLOAK_ISSUER_URI: ${SERVER_PROTOCOL:-http}://${SERVER_HOST:-localhost}:${HTTP_PORT:-80}/auth/realms/${KEYCLOAK_REALM:-musclub}
       KEYCLOAK_BASE_URL: http://keycloak:8180/auth
       KEYCLOAK_REALM: ${KEYCLOAK_REALM:-musclub}
       KEYCLOAK_ADMIN_USERNAME: ${KEYCLOAK_ADMIN:-admin}
