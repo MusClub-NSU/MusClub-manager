@@ -38,6 +38,8 @@ services:
       KC_HOSTNAME_STRICT: "false"
       KC_HOSTNAME_STRICT_HTTPS: "false"
       KC_HTTP_RELATIVE_PATH: /auth
+
+      FRONTEND_URL: ${SERVER_PROTOCOL:-http}://${SERVER_HOST:-localhost}:${HTTP_PORT:-80}
     volumes:
       - ./backend/keycloak:/opt/keycloak/data/import:ro
     depends_on:

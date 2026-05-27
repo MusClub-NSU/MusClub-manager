@@ -24,19 +24,20 @@
       "clientId": "musclub-frontend",
       "name": "MusClub Frontend",
       "enabled": true,
-      "baseUrl": "http://localhost:3000",
+      "baseUrl": "${env.FRONTEND_URL}",
       "publicClient": true,
       "standardFlowEnabled": true,
       "directAccessGrantsEnabled": true,
       "redirectUris": [
         "http://localhost:3000/*",
-        "http://localhost:3000/api/auth/callback/keycloak"
+        "${env.FRONTEND_URL}/*"
       ],
       "webOrigins": [
-        "http://localhost:3000"
+        "http://localhost:3000",
+        "${env.FRONTEND_URL}"
       ],
       "attributes": {
-        "post.logout.redirect.uris": "http://localhost:3000/*"
+        "post.logout.redirect.uris": "http://localhost:3000/*++${env.FRONTEND_URL}/*"
       },
       "protocol": "openid-connect"
     }
